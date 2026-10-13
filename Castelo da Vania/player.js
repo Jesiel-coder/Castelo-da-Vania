@@ -3,12 +3,17 @@ export class Player {
     constructor({ position, imageSrc }) {
         this.position = position
         this.velocity = { x: 0, y: 0 }
-        this.width = 48
-        this.height = 48
+
+        //colisão do player (hitbox)
+        this.width = 36
+        this.height = 70
 
         //imagem do spritesheet
         this.image = new Image()
         this.image.src = imageSrc
+
+        //quantas vezes o desenho é ampliado
+        this.scale = 2
 
         //controle da animação
         this.frameX = 0
@@ -42,7 +47,7 @@ export class Player {
         }
 
         //tamanho de cada quadro dentro do spritesheet
-        const sw = 48
+        const sw = 25
         const sh = 48
 
         //desenha só o quadro atual (recorte do spritesheet)
