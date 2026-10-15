@@ -30,7 +30,7 @@ class Sprite {
 //cria o player
 const player = new Player({
     position: { x: 0, y: 0 },
-    imageSrc: './img/SpriteSheetCaracter.png'
+    imageSrc: './img/spritesheet.png'
 })
 
 //cria o fundo
