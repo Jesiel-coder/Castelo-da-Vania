@@ -18,12 +18,12 @@ class Sprite {
         this.image.src = imageSrc
     }
 
-    draw() {
-        ctx.drawImage(this.image, this.position.x, this.position.y)
+    draw(context) {
+        context.drawImage(this.image, this.position.x, this.position.y)
     }
 
-    update() {
-        this.draw()
+    update(context) {
+        this.draw(context)
     }
 }
 
@@ -50,9 +50,16 @@ const keys = {
 //se o player está no chão (pra poder pular)
 let onGround = false
 
+let lastTime = 0
+const fpsInterval = 1000 / 60
+
 //animação no canvas
 function animate(timestamp) {
     window.requestAnimationFrame(animate)
+    
+ const timeSinceLastFrame = timestamp - lastTime
+ if (timeSinceLastFrame >= fpsInterval) {
+    lastTime = timestamp - (timeSinceLastFrame % fpsInterval)
 
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -100,7 +107,7 @@ function animate(timestamp) {
 
     player.draw(ctx, timestamp)
 }
-
+}
 animate(0)
 
 // Eventos de Teclado
