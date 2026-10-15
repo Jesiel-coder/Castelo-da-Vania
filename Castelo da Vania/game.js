@@ -119,9 +119,11 @@ window.addEventListener('keydown', (event) => {
         case 's':
         case 'S':
         case 'ArrowDown':
-            keys.s.pressed = true;
-            player.crouch();
-            break;
+    if (onGround) {
+        keys.s.pressed = true;
+        player.crouch();
+    }
+    break;
         case 'l':
         case 'L':
             keys.l.pressed = true;
@@ -153,9 +155,10 @@ window.addEventListener('keyup', (event) => {
         case 's':
         case 'S':
         case 'ArrowDown':
-            keys.s.pressed = false;
-            player.standUp();
-            break;
+    keys.s.pressed = false;
+    player.standUp();
+    break;
+
         case 'l':
         case 'L':
             keys.l.pressed = false;
