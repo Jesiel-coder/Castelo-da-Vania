@@ -44,6 +44,7 @@ const keys = {
     d: { pressed: false },
     a: { pressed: false },
     s: { pressed: false },
+    l: { pressed: false }
 }
 
 //se o player está no chão (pra poder pular)
@@ -53,77 +54,114 @@ let onGround = false
 function animate(timestamp) {
     window.requestAnimationFrame(animate)
 
-    //limpa a tela e desenha o fundo
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    background.update()
+    background.update(ctx)
 
-    //velocidade horizontal
-    player.velocity.x = 0
-    if (keys.d.pressed) player.velocity.x = 3
-    else if (keys.a.pressed) player.velocity.x = -3
+    // Movimento horizontal: Agora permite andar E atirar ao mesmo tempo! (apenas bloqueia se agachado)
+    player.velocity.x = 0;
+    if (!player.isCrouching) {
+        if (keys.d.pressed) player.velocity.x = 3;
+        else if (keys.a.pressed) player.velocity.x = -3;
+    }
 
-    //movimento do player
+    // Se estiver segurando a tecla L, tenta disparar continuamente respeitando a cadência
+    if (keys.l.pressed) {
+        player.shoot(timestamp);
+    }
+
     player.position.x += player.velocity.x
     player.position.y += player.velocity.y
 
-    //colisão: começa achando que está no ar
-onGround = false
+    onGround = false
 
-//chão
-if (player.position.y + player.height >= floorY) {
-    player.position.y = floorY - player.height
-    player.velocity.y = 0
-    onGround = true
-}
-
-//plataformas (só pousa se estiver caindo e vindo de cima)
-platforms.forEach(p => {
-    const pe = player.position.y + player.height   //pé do player agora
-    const peAntes = pe - player.velocity.y         //pé do player no frame anterior
-    const dentroX = player.position.x + player.width > p.x
-                 && player.position.x < p.x + p.w
-
-    if (dentroX && player.velocity.y >= 0 && peAntes <= p.y && pe >= p.y) {
-        player.position.y = p.y - player.height
+    // Colisão com o chão principal
+    if (player.position.y + player.height >= floorY) {
+        player.position.y = floorY - player.height
         player.velocity.y = 0
         onGround = true
     }
-})
 
-//gravidade (só se estiver no ar)
-if (!onGround) player.velocity.y += gravity
+    // Colisão com as plataformas
+    platforms.forEach(p => {
+        const pe = player.position.y + player.height
+        const peAntes = pe - player.velocity.y
+        const dentroX = player.position.x + player.width > p.x
+                     && player.position.x < p.x + p.w
 
-    //desenha o player
+        if (dentroX && player.velocity.y >= 0 && peAntes <= p.y && pe >= p.y) {
+            player.position.y = p.y - player.height
+            player.velocity.y = 0
+            onGround = true
+        }
+    })
+
+    if (!onGround) player.velocity.y += gravity
+
     player.draw(ctx, timestamp)
 }
 
 animate(0)
 
-//rastreamento de teclas (apertar)
+// Eventos de Teclado
 window.addEventListener('keydown', (event) => {
     switch (event.key) {
-        case 'd': keys.d.pressed = true; break
-        case 'a': keys.a.pressed = true; break
-        case 'w':
-            if (onGround){
-                player.velocity.y = -10.8
-                keys.s.pressed = false;
-            }
+        case 'd':
+        case 'D':
+        case 'ArrowRight':
+            keys.d.pressed = true;
+            break;
+        case 'a':
+        case 'A':
+        case 'ArrowLeft':
+            keys.a.pressed = true;
             break;
         case 's':
-            if (onGround){
-                keys.s.pressed = true;
+        case 'S':
+        case 'ArrowDown':
+    if (onGround) {
+        keys.s.pressed = true;
+        player.crouch();
+    }
+    break;
+        case 'l':
+        case 'L':
+            keys.l.pressed = true;
+            break;
+        case 'w':
+        case 'W':
+        case 'Space':
+        case ' ':
+            // Pula somente se estiver no chão e não estiver agachado
+            if (onGround && !player.isCrouching) {
+                player.velocity.y = -10.8;
             }
             break;
     }
 })
 
-//rastreamento de teclas (soltar)
 window.addEventListener('keyup', (event) => {
     switch (event.key) {
-        case 'd': keys.d.pressed = false; break
-        case 'a': keys.a.pressed = false; break
-        case 's': keys.s.pressed = false; break
+        case 'd':
+        case 'D':
+        case 'ArrowRight':
+            keys.d.pressed = false;
+            break;
+        case 'a':
+        case 'A':
+        case 'ArrowLeft':
+            keys.a.pressed = false;
+            break;
+        case 's':
+        case 'S':
+        case 'ArrowDown':
+    keys.s.pressed = false;
+    player.standUp();
+    break;
+
+        case 'l':
+        case 'L':
+            keys.l.pressed = false;
+            break;
     }
 })
