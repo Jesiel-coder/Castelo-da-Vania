@@ -1,4 +1,5 @@
 import { Player } from "./player.js"
+import { platforms, floorY } from "./mapa.js"
 
 const canvas = document.querySelector('canvas')
 const ctx = canvas.getContext('2d')
@@ -29,7 +30,7 @@ class Sprite {
 //cria o player
 const player = new Player({
     position: { x: 0, y: 0 },
-    imageSrc: './img/SpriteSheetCaracter.png'
+    imageSrc: './img/spritesheet.png'
 })
 
 //cria o fundo
@@ -65,14 +66,32 @@ function animate(timestamp) {
     player.position.x += player.velocity.x
     player.position.y += player.velocity.y
 
-    //gravidade e chão
-    if (player.position.y + player.height + player.velocity.y < canvas.height) {
-        player.velocity.y += gravity
-        onGround = false
-    } else {
+    //colisão: começa achando que está no ar
+onGround = false
+
+//chão
+if (player.position.y + player.height >= floorY) {
+    player.position.y = floorY - player.height
+    player.velocity.y = 0
+    onGround = true
+}
+
+//plataformas (só pousa se estiver caindo e vindo de cima)
+platforms.forEach(p => {
+    const pe = player.position.y + player.height   //pé do player agora
+    const peAntes = pe - player.velocity.y         //pé do player no frame anterior
+    const dentroX = player.position.x + player.width > p.x
+                 && player.position.x < p.x + p.w
+
+    if (dentroX && player.velocity.y >= 0 && peAntes <= p.y && pe >= p.y) {
+        player.position.y = p.y - player.height
         player.velocity.y = 0
         onGround = true
     }
+})
+
+//gravidade (só se estiver no ar)
+if (!onGround) player.velocity.y += gravity
 
     //desenha o player
     player.draw(ctx, timestamp)
@@ -86,7 +105,7 @@ window.addEventListener('keydown', (event) => {
         case 'd': keys.d.pressed = true; break
         case 'a': keys.a.pressed = true; break
         case 'w':
-            if (onGround) player.velocity.y = -15
+            if (onGround) player.velocity.y = -10.8
             break
     }
 })
