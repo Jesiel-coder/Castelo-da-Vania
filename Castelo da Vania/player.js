@@ -8,7 +8,7 @@ export class Player {
         this.width = 36
         this.height = 70
 
-        //imagem do spritesheet (use o spritesheet_64.png)
+        //imagem do spritesheet
         this.image = new Image()
         this.image.src = imageSrc
 

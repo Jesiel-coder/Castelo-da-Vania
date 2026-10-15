@@ -43,6 +43,7 @@ const background = new Sprite({
 const keys = {
     d: { pressed: false },
     a: { pressed: false },
+    s: { pressed: false },
 }
 
 //se o player está no chão (pra poder pular)
@@ -105,8 +106,16 @@ window.addEventListener('keydown', (event) => {
         case 'd': keys.d.pressed = true; break
         case 'a': keys.a.pressed = true; break
         case 'w':
-            if (onGround) player.velocity.y = -10.8
-            break
+            if (onGround){
+                player.velocity.y = -10.8
+                keys.s.pressed = false;
+            }
+            break;
+        case 's':
+            if (onGround){
+                keys.s.pressed = true;
+            }
+            break;
     }
 })
 
@@ -115,5 +124,6 @@ window.addEventListener('keyup', (event) => {
     switch (event.key) {
         case 'd': keys.d.pressed = false; break
         case 'a': keys.a.pressed = false; break
+        case 's': keys.s.pressed = false; break
     }
 })
