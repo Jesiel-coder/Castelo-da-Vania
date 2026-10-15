@@ -1,0 +1,20 @@
+/* tira as margens padrão e deixa o fundo preto */
+html, body {
+    margin: 0;
+    height: 100%;
+    background: black;
+    overflow: hidden;
+}
+
+/* centraliza o canvas na tela */
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* estica o canvas o máximo possível, mantendo a proporção 16:9 */
+canvas {
+    width: min(100vw, 177.78vh);
+    aspect-ratio: 16 / 9;
+}

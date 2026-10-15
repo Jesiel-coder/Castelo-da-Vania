@@ -51,7 +51,7 @@ const keys = {
 let onGround = false
 
 let lastTime = 0
-const fpsInterval = 1000 / 60
+const fpsInterval = 1000 / 60 - 1
 
 //animação no canvas
 function animate(timestamp) {
