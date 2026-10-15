@@ -49,21 +49,11 @@ const keys = {
 //se o player está no chão (pra poder pular)
 let onGround = false
 
-const fpsInterval = 1000 / 60 // Define o tempo padrão para 60 frames por segundo
-let lastTime = 0
-
 //animação no canvas
 function animate(timestamp) {
     window.requestAnimationFrame(animate)
 
-<<<<<<< Updated upstream
     //limpa a tela e desenha o fundo
-=======
-    const elapsed = timestamp - lastTime
-    if (elapsed < fpsInterval) return
-    lastTime = timestamp - (elapsed % fpsInterval)
-
->>>>>>> Stashed changes
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     background.update()
@@ -122,29 +112,8 @@ window.addEventListener('keydown', (event) => {
             }
             break;
         case 's':
-<<<<<<< Updated upstream
             if (onGround){
                 keys.s.pressed = true;
-=======
-        case 'S':
-        case 'ArrowDown':
-            if (onGround) {
-        keys.s.pressed = true;
-        player.crouch();
-    }
-    break;
-        case 'l':
-        case 'L':
-            keys.l.pressed = true;
-            break;
-        case 'w':
-        case 'W':
-        case 'Space':
-        case ' ':
-            // Pula somente se estiver no chão e não estiver agachado
-            if (onGround && !player.isCrouching) {
-                player.velocity.y = -10.8;
->>>>>>> Stashed changes
             }
             break;
     }
@@ -153,31 +122,8 @@ window.addEventListener('keydown', (event) => {
 //rastreamento de teclas (soltar)
 window.addEventListener('keyup', (event) => {
     switch (event.key) {
-<<<<<<< Updated upstream
         case 'd': keys.d.pressed = false; break
         case 'a': keys.a.pressed = false; break
         case 's': keys.s.pressed = false; break
-=======
-        case 'd':
-        case 'D':
-        case 'ArrowRight':
-            keys.d.pressed = false;
-            break;
-        case 'a':
-        case 'A':
-        case 'ArrowLeft':
-            keys.a.pressed = false;
-            break;
-        case 's':
-        case 'S':
-        case 'ArrowDown':
-             keys.s.pressed = false;
-            player.standUp();
-            break;
-        case 'l':
-        case 'L':
-            keys.l.pressed = false;
-            break;
->>>>>>> Stashed changes
     }
 })
