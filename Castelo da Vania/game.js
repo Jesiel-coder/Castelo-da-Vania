@@ -105,7 +105,7 @@ window.addEventListener('keydown', (event) => {
         case 'd': keys.d.pressed = true; break
         case 'a': keys.a.pressed = true; break
         case 'w':
-            if (onGround) player.velocity.y = -15
+            if (onGround) player.velocity.y = -10.8
             break
     }
 })

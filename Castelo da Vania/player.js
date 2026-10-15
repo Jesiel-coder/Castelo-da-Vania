@@ -8,19 +8,26 @@ export class Player {
         this.width = 36
         this.height = 70
 
-        //imagem do spritesheet
+        //imagem do spritesheet (use o spritesheet_64.png)
         this.image = new Image()
         this.image.src = imageSrc
 
-        //quantas vezes o desenho é ampliado
+        //cada quadro do spritesheet tem 64x64 e é ampliado 2x
+        this.frameSize = 64
         this.scale = 2
 
-        //controle da animação
+        //animações: fileira do spritesheet, quantidade de quadros e tempo (ms) entre quadros
+        this.animations = {
+            idle: { row: 0, frames: 4,  interval: 150 },
+            walk: { row: 4, frames: 17, interval: 70 },
+        }
+        this.currentAnimation = 'idle'
         this.frameX = 0
-        this.frameY = 0
-        this.maxFrame = 5
-        this.frameInterval = 120   //tempo (ms) entre uma troca de quadro e outra
         this.lastTime = 0
+
+        //direção: o sprite original olha pra qual lado?
+        this.facingRight = true
+        this.spriteFacesRight = true   //se ele andar "de costas", troque pra false
     }
 
     draw(ctx, timestamp) {
@@ -31,30 +38,44 @@ export class Player {
             return
         }
 
-        //troca de quadro a cada frameInterval ms
-        if (timestamp - this.lastTime > this.frameInterval) {
+        //escolhe a animação: andando ou parado (reinicia o quadro ao trocar)
+        const next = this.velocity.x !== 0 ? 'walk' : 'idle'
+        if (next !== this.currentAnimation) {
+            this.currentAnimation = next
+            this.frameX = 0
+        }
+
+        //guarda pra qual lado ele está virado
+        if (this.velocity.x > 0) this.facingRight = true
+        else if (this.velocity.x < 0) this.facingRight = false
+
+        //troca de quadro a cada "interval" ms
+        const anim = this.animations[this.currentAnimation]
+        if (timestamp - this.lastTime > anim.interval) {
             this.lastTime = timestamp
-            this.frameX = this.frameX < this.maxFrame ? this.frameX + 1 : 0
+            this.frameX = (this.frameX + 1) % anim.frames
         }
 
-        //escolhe a animação: andando ou parado
-        if (this.velocity.x !== 0) {
-            this.frameY = 3
-            this.maxFrame = 10
-        } else {
-            this.frameY = 0
-            this.maxFrame = 5
+        //tamanho final do desenho e posição: centralizado na hitbox, pés na base dela
+        const size = this.frameSize * this.scale
+        const centerX = this.position.x + this.width / 2
+        const dx = centerX - size / 2
+        const dy = this.position.y + this.height - size
+
+        ctx.imageSmoothingEnabled = false   //mantém a pixel art nítida
+
+        ctx.save()
+        //espelha o desenho quando ele olha pro lado contrário do sprite
+        if (this.facingRight !== this.spriteFacesRight) {
+            ctx.translate(centerX, 0)
+            ctx.scale(-1, 1)
+            ctx.translate(-centerX, 0)
         }
-
-        //tamanho de cada quadro dentro do spritesheet
-        const sw = 25
-        const sh = 48
-
-        //desenha só o quadro atual (recorte do spritesheet)
         ctx.drawImage(
             this.image,
-            this.frameX * sw, this.frameY * sh, sw, sh,
-            this.position.x, this.position.y, this.width, this.height
+            this.frameX * this.frameSize, anim.row * this.frameSize, this.frameSize, this.frameSize,
+            dx, dy, size, size
         )
+        ctx.restore()
     }
 }
