@@ -130,7 +130,7 @@ window.addEventListener('keydown', (event) => {
             break;
         case 'w':
         case 'W':
-        case 'Space':
+        case 'ArrowUp':
         case ' ':
             // Pula somente se estiver no chão e não estiver agachado
             if (onGround && !player.isCrouching) {
