@@ -18,8 +18,57 @@ export class Player {
 
         //animações: fileira do spritesheet, quantidade de quadros e tempo (ms) entre quadros
         this.animations = {
+<<<<<<< Updated upstream
             idle: { row: 0, frames: 4,  interval: 150 },
             walk: { row: 4, frames: 17, interval: 70 },
+=======
+            idle:   { row: 0, frames: 4,  interval: 150 },
+            crouch: { row: 1, frames: 4, interval: 220}, // Linha 2 para agachar
+            shoot:  { row: 2, frames: 11, interval: 80  }, // Linha 3 para atirar
+            walk:   { row: 4, frames: 17, interval: 25  }  // Linha 5 para andar
+        };
+
+        this.currentAnimation = 'idle';
+        this.frameX = 0;
+        this.lastTime = 0;
+
+        this.facingRight = true;
+        this.spriteFacesRight = true;
+
+        this.isCrouching = false;
+        this.isShooting = false;
+
+        this.shootTimer = 0
+        this.shootCooldown = 250
+    }
+
+    crouch(floorY, platforms) {
+        if (!this.isCrouching) {
+            this.isCrouching = true;
+            this.height = this.crouchHeight;
+            
+            // Move o Y para baixo para manter os pés colados no chão ao encolher a hitbox
+            this.position.y += (this.normalHeight - this.crouchHeight);
+        }
+    }
+
+    standUp() {
+       // Só executa se ele ESTIVER agachado
+        if (this.isCrouching) {
+            this.isCrouching = false;
+            
+            // Move o Y para cima para dar espaço para a hitbox crescer sem empurrar o chão
+            this.position.y -= (this.normalHeight - this.crouchHeight);
+            this.height = this.normalHeight;
+        }
+    }
+
+    shoot(timestamp) {
+        if (timestamp - this.shootTimer > this.shootCooldown) {
+            this.shootTimer = timestamp
+            this.isShooting = true
+            return true // Indica que o tiro foi disparado com sucesso
+>>>>>>> Stashed changes
         }
         this.currentAnimation = 'idle'
         this.frameX = 0
