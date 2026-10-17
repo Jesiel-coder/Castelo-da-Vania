@@ -1,5 +1,5 @@
 import { Player } from "./player.js"
-import { platforms, floorY } from "./mapa.js"
+import { salas } from "./salas.js"
 
 const canvas = document.querySelector('canvas')
 const ctx = canvas.getContext('2d')
@@ -10,34 +10,24 @@ canvas.height = 576
 //gravidade
 const gravity = 0.5
 
-//classe que mexe no fundo e nas sprites
-class Sprite {
-    constructor({ position, imageSrc }) {
-        this.position = position
-        this.image = new Image()
-        this.image.src = imageSrc
-    }
-
-    draw(context) {
-        context.drawImage(this.image, this.position.x, this.position.y)
-    }
-
-    update(context) {
-        this.draw(context)
-    }
-}
-
 //cria o player
 const player = new Player({
     position: { x: 0, y: 0 },
     imageSrc: './img/spritesheet.png'
 })
 
-//cria o fundo
-const background = new Sprite({
-    position: { x: 0, y: 0 },
-    imageSrc: './img/background.png'
-})
+//sala atual e as imagens dela
+let sala = salas.tutorial
+const sky = new Image()
+const level = new Image()
+
+//carrega uma sala (troca as imagens)
+function carregarSala(nova) {
+    sala = nova
+    sky.src = sala.ceu
+    level.src = sala.cenario
+}
+carregarSala(salas.tutorial)
 
 //teclas apertadas
 const keys = {
@@ -50,20 +40,23 @@ const keys = {
 //se o player está no chão (pra poder pular)
 let onGround = false
 
+//câmera (só anda na horizontal)
+const camera = { x: 0 }
+
+//tempo do frame anterior (pro delta time)
 let lastTime = 0
-const fpsInterval = 1000 / 60 - 1
 
 //animação no canvas
 function animate(timestamp) {
     window.requestAnimationFrame(animate)
-    
- const timeSinceLastFrame = timestamp - lastTime
- if (timeSinceLastFrame >= fpsInterval) {
-    lastTime = timestamp - (timeSinceLastFrame % fpsInterval)
+
+    //delta time: quantos "frames de 60fps" passaram desde o último frame
+    //(1 = 60fps, 0.6 = 100fps). O limite de 50ms evita saltos quando a aba fica em segundo plano
+    const dt = Math.min(timestamp - lastTime, 50) / (1000 / 60)   //←
+    lastTime = timestamp                                           //←
 
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    background.update(ctx)
 
     // Movimento horizontal: Agora permite andar E atirar ao mesmo tempo! (apenas bloqueia se agachado)
     player.velocity.x = 0;
@@ -77,22 +70,24 @@ function animate(timestamp) {
         player.shoot(timestamp);
     }
 
-    player.position.x += player.velocity.x
-    player.position.y += player.velocity.y
+    player.position.x += player.velocity.x * dt   //←
+    player.position.y += player.velocity.y * dt   //←
+
+    player.position.x = Math.max(0, Math.min(player.position.x, sala.largura - player.width)) 
 
     onGround = false
 
     // Colisão com o chão principal
-    if (player.position.y + player.height >= floorY) {
-        player.position.y = floorY - player.height
+    if (player.position.y + player.height >= sala.floorY) {   //←
+        player.position.y = sala.floorY - player.height        //←
         player.velocity.y = 0
         onGround = true
     }
 
     // Colisão com as plataformas
-    platforms.forEach(p => {
+    sala.platforms.forEach(p => {                              //←
         const pe = player.position.y + player.height
-        const peAntes = pe - player.velocity.y
+        const peAntes = pe - player.velocity.y * dt            //←
         const dentroX = player.position.x + player.width > p.x
                      && player.position.x < p.x + p.w
 
@@ -103,10 +98,24 @@ function animate(timestamp) {
         }
     })
 
-    if (!onGround) player.velocity.y += gravity
+        if (!onGround) player.velocity.y += gravity * dt   //←
 
+    //câmera segue o player, sem passar das bordas da sala
+    camera.x = player.position.x + player.width / 2 - canvas.width / 2
+    camera.x = Math.round(Math.max(0, Math.min(camera.x, sala.largura - canvas.width)))
+
+    //céu: anda só 10% da câmera
+    ctx.drawImage(sky, Math.round(-camera.x * 0.1), 0, sky.width * 3, sky.height * 3)
+
+    //cenário: recorta a faixa na posição da câmera
+    const r = sala.recorte
+    ctx.drawImage(level, camera.x, r.y, canvas.width, r.h, 0, canvas.height - r.h, canvas.width, r.h)
+
+    //player: desenhado deslocado pela câmera (ele vive nas coordenadas do mundo)
+    ctx.save()
+    ctx.translate(-camera.x, 0)
     player.draw(ctx, timestamp)
-}
+    ctx.restore()
 }
 animate(0)
 
