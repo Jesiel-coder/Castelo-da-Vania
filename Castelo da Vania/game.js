@@ -141,7 +141,7 @@ function animate(timestamp) {
     //player: desenhado deslocado pela câmera (ele vive nas coordenadas do mundo)
     ctx.save()
     ctx.translate(-camera.x, 0)
-    player.draw(ctx, timestamp)
+    player.draw(ctx, timestamp, onGround)
     ctx.restore()
 }
 animate(0)
