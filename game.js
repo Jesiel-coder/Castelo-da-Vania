@@ -12,6 +12,46 @@ ctx.imageSmoothingEnabled = false   // sem isso o pixel art fica borrado ao esca
 //gravidade
 const gravity = 0.5
 
+// Verifica os eventos da sala atual
+function verificarEventos() {
+    if (!sala.eventList) return;
+
+    for (const evento of sala.eventList) {
+        // Verifica se o jogador chegou ao ponto do evento
+        if (player.position.x >= evento.x) {
+            if (evento.acao === 'trocarSala') {
+                const destino = salas[evento.destino];
+
+                if (!destino) {
+                    console.error('Sala não encontrada:', evento.destino);
+                    continue;
+                }
+
+                console.log('Trocando de sala:', evento.destino);
+
+                // Carrega a nova sala
+                carregarSala(destino);
+
+                // Posiciona o jogador na entrada
+                player.position.x = evento.spawn.x;
+                player.position.y = destino.floorY - player.height;
+
+                // Zera a velocidade
+                player.velocity.x = 0;
+                player.velocity.y = 0;
+
+                // Reinicia a câmera
+                camera.x = 0;
+
+                // Impede que outros eventos da sala antiga sejam processados
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 //cria o player
 const player = new Player({
     position: { x: 0, y: 0 },
@@ -26,10 +66,16 @@ const level = new Image()
 
 //carrega uma sala (troca as imagens)
 function carregarSala(nova) {
-    sala = nova
-    larguraMundo = sala.largura * sala.escala
-    sky.src = sala.ceu
-    level.src = sala.cenario
+    sala = nova;
+    larguraMundo = sala.largura * sala.escala;
+
+    if (sala.ceu) {
+        sky.src = sala.ceu;
+    } else {
+        sky.src = '';
+    }
+
+    level.src = sala.cenario;
 }
 carregarSala(salas.tutorial)
 
@@ -61,7 +107,7 @@ const CEU_ESCALA = 3   // sky.png tem 384x224, vira 1152x672
 
 function desenharCeu() {
     if (!sky.complete || sky.naturalWidth === 0) return
-
+    if (!sala.ceu) return
     const w = sky.naturalWidth * CEU_ESCALA
     const h = sky.naturalHeight * CEU_ESCALA
 
@@ -128,6 +174,7 @@ function animate(timestamp) {
 
     if (!onGround) player.velocity.y += gravity * dt   //←
 
+    verificarEventos();
     //câmera segue o player, sem passar das bordas da sala
     const S = sala.escala
     camera.x = player.position.x + player.width / 2 - canvas.width / 2
