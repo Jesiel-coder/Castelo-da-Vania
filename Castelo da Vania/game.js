@@ -7,6 +7,8 @@ const ctx = canvas.getContext('2d')
 canvas.width = 1024
 canvas.height = 576
 
+ctx.imageSmoothingEnabled = false   // sem isso o pixel art fica borrado ao escalar
+
 //gravidade
 const gravity = 0.5
 
@@ -18,12 +20,14 @@ const player = new Player({
 
 //sala atual e as imagens dela
 let sala = salas.tutorial
+let larguraMundo = 0
 const sky = new Image()
 const level = new Image()
 
 //carrega uma sala (troca as imagens)
 function carregarSala(nova) {
     sala = nova
+    larguraMundo = sala.largura * sala.escala
     sky.src = sala.ceu
     level.src = sala.cenario
 }
@@ -45,6 +49,23 @@ const camera = { x: 0 }
 
 //tempo do frame anterior (pro delta time)
 let lastTime = 0
+
+const CEU_ESCALA = 3   // sky.png tem 384x224, vira 1152x672
+
+function desenharCeu() {
+    if (!sky.complete || sky.naturalWidth === 0) return
+
+    const w = sky.naturalWidth * CEU_ESCALA
+    const h = sky.naturalHeight * CEU_ESCALA
+
+    // quanto o céu já andou, "dando a volta" a cada largura da imagem
+    const offset = Math.round((camera.x * sala.ceuFator) % w)
+
+    // repete lado a lado até preencher a tela
+    for (let x = -offset; x < canvas.width; x += w) {
+        ctx.drawImage(sky, x, 0, w, h)
+    }
+}
 
 //animação no canvas
 function animate(timestamp) {
@@ -73,7 +94,7 @@ function animate(timestamp) {
     player.position.x += player.velocity.x * dt   //←
     player.position.y += player.velocity.y * dt   //←
 
-    player.position.x = Math.max(0, Math.min(player.position.x, sala.largura - player.width)) 
+    player.position.x = Math.max(0, Math.min(player.position.x, larguraMundo - player.width))
 
     onGround = false
 
@@ -89,7 +110,7 @@ function animate(timestamp) {
         const pe = player.position.y + player.height
         const peAntes = pe - player.velocity.y * dt            //←
         const dentroX = player.position.x + player.width > p.x
-                     && player.position.x < p.x + p.w
+            && player.position.x < p.x + p.w
 
         if (dentroX && player.velocity.y >= 0 && peAntes <= p.y && pe >= p.y) {
             player.position.y = p.y - player.height
@@ -98,23 +119,29 @@ function animate(timestamp) {
         }
     })
 
-        if (!onGround) player.velocity.y += gravity * dt   //←
+    if (!onGround) player.velocity.y += gravity * dt   //←
 
     //câmera segue o player, sem passar das bordas da sala
+    const S = sala.escala
     camera.x = player.position.x + player.width / 2 - canvas.width / 2
-    camera.x = Math.round(Math.max(0, Math.min(camera.x, sala.largura - canvas.width)))
+    camera.x = Math.max(0, Math.min(camera.x, larguraMundo - canvas.width))
+    camera.x = Math.round(camera.x / S) * S
 
     //céu: anda só 10% da câmera
-    ctx.drawImage(sky, Math.round(-camera.x * 0.1), 0, sky.width * 3, sky.height * 3)
-
+    desenharCeu()
+    
     //cenário: recorta a faixa na posição da câmera
     const r = sala.recorte
-    ctx.drawImage(level, camera.x, r.y, canvas.width, r.h, 0, canvas.height - r.h, canvas.width, r.h)
+    ctx.drawImage(
+        level,
+        camera.x / S, r.y, canvas.width / S, r.h,                 // origem (imagem)
+        0, canvas.height - r.h * S, canvas.width, r.h * S         // destino (canvas)
+    )
 
     //player: desenhado deslocado pela câmera (ele vive nas coordenadas do mundo)
     ctx.save()
     ctx.translate(-camera.x, 0)
-    player.draw(ctx, timestamp)
+    player.draw(ctx, timestamp, onGround)
     ctx.restore()
 }
 animate(0)
@@ -135,11 +162,11 @@ window.addEventListener('keydown', (event) => {
         case 's':
         case 'S':
         case 'ArrowDown':
-    if (onGround) {
-        keys.s.pressed = true;
-        player.crouch();
-    }
-    break;
+            if (onGround) {
+                keys.s.pressed = true;
+                player.crouch();
+            }
+            break;
         case 'l':
         case 'L':
             keys.l.pressed = true;
@@ -171,9 +198,9 @@ window.addEventListener('keyup', (event) => {
         case 's':
         case 'S':
         case 'ArrowDown':
-    keys.s.pressed = false;
-    player.standUp();
-    break;
+            keys.s.pressed = false;
+            player.standUp();
+            break;
 
         case 'l':
         case 'L':
