@@ -21,7 +21,7 @@ export const salas = {
                 x: 500,
                 acao: 'trocarSala',
                 destino: 'ponte',
-                spawn: { x: 50, },
+                spawn: { x: 83, },
             },
         ],
     },
@@ -35,6 +35,16 @@ export const salas = {
         largura: 1024,
         floorY: 531,
         platforms: [],
+        solidos: [
+    // Parede esquerda da torre
+    { x: 0, y: 0, w: 46, h: 530 },
+
+    // Parede horizontal abaixo da porta superior
+    { x: 1345, y: 245, w: 142, h: 96 },
+
+    // Parede direita da torre
+    { x: 1488, y: 0, w: 100, h: 541 },
+        ],
         eventList: [],
     },
 };

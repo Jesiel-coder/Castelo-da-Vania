@@ -68,13 +68,7 @@ const level = new Image()
 function carregarSala(nova) {
     sala = nova;
     larguraMundo = sala.largura * sala.escala;
-
-    if (sala.ceu) {
-        sky.src = sala.ceu;
-    } else {
-        sky.src = '';
-    }
-
+    sky.src = sala.ceu || '';
     level.src = sala.cenario;
 }
 carregarSala(salas.tutorial)
@@ -147,6 +141,40 @@ function animate(timestamp) {
     player.position.x += player.velocity.x * dt   //←
     player.position.y += player.velocity.y * dt   //←
 
+    // Colisão horizontal com paredes sólidas
+if (sala.solidos) {
+    for (const parede of sala.solidos) {
+        const esquerda = player.position.x;
+        const direita = esquerda + player.width;
+        const topo = player.position.y;
+        const base = topo + player.height;
+
+        // Verifica se o jogador está na altura da parede
+        const sobrepoeY =
+            base > parede.y &&
+            topo < parede.y + parede.h;
+
+        if (!sobrepoeY) continue;
+
+        // Impede atravessar a parede pela direita
+        if (
+            player.velocity.x > 0 &&
+            direita > parede.x &&
+            esquerda < parede.x + parede.w
+        ) {
+            player.position.x = parede.x - player.width;
+        }
+
+        // Impede atravessar a parede pela esquerda
+        if (
+            player.velocity.x < 0 &&
+            esquerda < parede.x + parede.w &&
+            direita > parede.x
+        ) {
+            player.position.x = parede.x + parede.w;
+        }
+    }
+}
     player.position.x = Math.max(0, Math.min(player.position.x, larguraMundo - player.width))
 
     onGround = false
