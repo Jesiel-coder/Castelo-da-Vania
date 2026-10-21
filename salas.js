@@ -8,21 +8,31 @@ export const salas = {
         escala: 2,
         recorte: { y: 770, h: 279 },   //faixa da imagem que tem desenho
         largura: 2550,
-        floorY: 500,
+        floorY: 549,
         platforms: [
             { x: 574, y: 432, w: 65, h: 17 },
             { x: 767, y: 369, w: 63, h: 17 },
             { x: 1023, y: 305, w: 64, h: 17 },
             { x: 1281, y: 441, w: 64, h: 7 },
+
+            //chão
+            { x: 0, y: 500, w: 835, h: 30 },
+            { x: 1346, y: 500, w: 3690, h: 20 },
         ],
 
         solidos: [
+            //plataforma pré espinho
+            { x: 0, y: 500, w: 835, h: 100 },
+            //plataforma pós espinho
             { x: 1281, y: 448, w: 64, h: 59 },
+
+            //portão no final
+            { x: 4993, y: 47, w: 62, h: 254 },
         ],
         eventList: [
             {
                 id: 'irParaCorredor',
-                x: 5040,
+                x: 5070,
                 acao: 'trocarSala',
                 destino: 'corredor',
                 spawn: { x: 0, },
@@ -42,11 +52,18 @@ export const salas = {
             { x: 1025, y: 414, w: 160, h: 25 },
             { x: 1025, y: 190, w: 160, h: 25 },
         ],
-        solidos: [],
+        solidos: [
+            //esquerda do mapa
+            { x: 0, y: 30, w: 36, h: 301 },
+            //direita do mapa
+            { x: 0, y: 30, w: 2208, h: 31 },
+            //topo do mapa
+            { x: 2181, y: 63, w: 23, h: 216 },
+        ],
         eventList: [
             {
                 id: 'irParaponte',
-                x: 2120,
+                x: 2189,
                 acao: 'trocarSala',
                 destino: 'ponte',
                 spawn: { x: 50, },
@@ -77,6 +94,8 @@ export const salas = {
 
             // Parede direita da torre
             { x: 1488, y: 0, w: 100, h: 541 },
+            //topo do mapa
+            { x: 0, y: 0, w: 1535, h: 135 },
         ],
         eventList: [
             {
@@ -134,15 +153,24 @@ export const salas = {
     },
 
     final: {
-        ceu: './img/sky.png',
-        ceuFator: 0.1,
         cenario: './img/finalRoom.png',
         escala: 1.7,
         recorte: { y: 0, h: 512 },
         largura: 800,
         floorY: 522,
-        platforms: [],
-        solidos: [],
+        platforms: [
+            { x:  760, y: 466, w: 380, h: 19 },
+        ],
+        solidos: [
+            //direita do mapa
+            { x: 1312, y: 32, w: 42, h: 488 },
+            //esquerda do mapa
+            { x: 0, y: 32, w: 47, h: 487 },
+            //topo do mapa 
+            { x: 0, y: 32, w: 1359, h: 54 },
+            //embaixo do bau
+            { x: 763, y: 483, w: 378, h: 36 },
+        ],
         eventList: [],
     },
 };

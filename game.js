@@ -22,7 +22,7 @@ const gravity = 0.45;
 // ==========================================
 
 const player = new Player({
-    position: { x: 0, y: 500 },
+    position: { x: 0, y: 430 },
     imageSrc: "./img/spritesheet.png"
 });
 
@@ -40,6 +40,7 @@ const level = new Image();
 const camera = { x: 0 };
 
 let onGround = false;
+let pulosUsados = 0;
 let lastTime = 0;
 
 // Evita processar o mesmo evento várias vezes.
@@ -59,7 +60,8 @@ const keys = {
 
 // Guarda coisas que já aconteceram no jogo (chefe derrotado, etc).
 const estado = {
-    bossMorto: false
+    bossMorto: false,
+    puloDuplo: false
 };
 
 // ==========================================
@@ -589,8 +591,11 @@ function animate(timestamp) {
     resolverColisoesVerticais(anterior);
 
     resolverChao();
-
+    
     resolverPlataformas(anterior);
+
+    // Encostou no chão ou numa plataforma: recupera os pulos.
+    if (onGround) pulosUsados = 0;
 
     // --------------------------------------
     // GRAVIDADE
@@ -682,9 +687,11 @@ window.addEventListener("keydown", (event) => {
             break;
 
         // TESTE TEMPORÁRIO: simula o boss morrendo. Apaga depois.
-        case "k":
+        case "m":
+        case "M":
             estado.bossMorto = true;
-            console.log("Boss morto!");
+            estado.puloDuplo = true;
+            console.log("Boss morto! Pulo duplo liberado.");
             break;
 
         case "w":
@@ -693,12 +700,19 @@ window.addEventListener("keydown", (event) => {
         case " ":
             event.preventDefault();
 
-            if (
-                onGround &&
-                !player.isCrouching
-            ) {
-                player.velocity.y = -13, 5;
+            if (player.isCrouching) break;
+
+            if (onGround) {
+                player.velocity.y = -13.5;
                 onGround = false;
+                pulosUsados = 1;
+            } else if (
+                estado.puloDuplo &&
+                pulosUsados < 2 &&
+                !event.repeat
+            ) {
+                player.velocity.y = -13.5;
+                pulosUsados = 2;
             }
             break;
     }
