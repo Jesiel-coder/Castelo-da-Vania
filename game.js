@@ -88,8 +88,8 @@ function carregarSala(nova) {
     level.src = sala.cenario;
 
     level.onload = () => {
-    console.log("Tamanho da imagem:", level.naturalWidth, level.naturalHeight);
-};
+        console.log("Tamanho da imagem:", level.naturalWidth, level.naturalHeight);
+    };
     // Carrega o céu somente se a sala possuir um.
     if (sala.ceu) {
         sky.src = sala.ceu;
@@ -675,17 +675,17 @@ window.addEventListener("keydown", (event) => {
             keys.l.pressed = true;
             break;
 
-            case "e":
-            case "E":
-        // event.repeat evita que segurar a tecla dispare várias vezes.
-        if (!event.repeat) keys.e.pressed = true;
-        break;
+        case "e":
+        case "E":
+            // event.repeat evita que segurar a tecla dispare várias vezes.
+            if (!event.repeat) keys.e.pressed = true;
+            break;
 
         // TESTE TEMPORÁRIO: simula o boss morrendo. Apaga depois.
         case "k":
-        estado.bossMorto = true;
-        console.log("Boss morto!");
-        break;
+            estado.bossMorto = true;
+            console.log("Boss morto!");
+            break;
 
         case "w":
         case "W":
@@ -697,7 +697,7 @@ window.addEventListener("keydown", (event) => {
                 onGround &&
                 !player.isCrouching
             ) {
-                player.velocity.y = -13,5;
+                player.velocity.y = -13, 5;
                 onGround = false;
             }
             break;
@@ -734,10 +734,10 @@ window.addEventListener("keyup", (event) => {
             keys.l.pressed = false;
             break;
 
-            case "e":
+        case "e":
         case "E":
-        keys.e.pressed = false;
-        break;
+            keys.e.pressed = false;
+            break;
     }
 });
 
@@ -749,6 +749,6 @@ window.addEventListener("blur", () => {
     keys.s.pressed = false;
     keys.l.pressed = false;
     keys.e.pressed = false;
-    
+
     player.standUp();
 });
