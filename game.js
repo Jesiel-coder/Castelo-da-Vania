@@ -1,176 +1,373 @@
-import { Player } from "./player.js"
-import { salas } from "./salas.js"
+import { Player } from "./player.js";
+import { salas } from "./salas.js";
 
-const canvas = document.querySelector('canvas')
-const ctx = canvas.getContext('2d')
+// ==========================================
+// CONFIGURAÇÃO DO CANVAS
+// ==========================================
 
-canvas.width = 1024
-canvas.height = 576
+const canvas = document.querySelector("canvas");
+const ctx = canvas.getContext("2d");
 
-ctx.imageSmoothingEnabled = false   // Sem isso o pixel art fica borrado ao escalar
+document.querySelector("canvas").getBoundingClientRect()
 
-// Gravidade aplicada ao mundo
-const gravity = 0.5
+canvas.width = 1024;
+canvas.height = 576;
 
-// Verifica os eventos da sala atual (como troca de salas, portas, etc.)
+ctx.imageSmoothingEnabled = false;
+
+const gravity = 0.5;
+
+// ==========================================
+// JOGADOR
+// ==========================================
+
+const player = new Player({
+    position: { x: 0, y: 500 },
+    imageSrc: "./img/spritesheet.png"
+});
+
+// ==========================================
+// SALA E RECURSOS
+// ==========================================
+
+let sala = salas.tutorial;
+
+let larguraMundo = sala.largura * sala.escala;
+
+const sky = new Image();
+const level = new Image();
+
+const camera = { x: 0 };
+
+let onGround = false;
+let lastTime = 0;
+
+// Evita processar o mesmo evento várias vezes.
+const eventosAtivados = new Set();
+
+// ==========================================
+// TECLAS
+// ==========================================
+
+const keys = {
+    d: { pressed: false },
+    a: { pressed: false },
+    s: { pressed: false },
+    l: { pressed: false },
+    e: { pressed: false }
+};
+
+// Guarda coisas que já aconteceram no jogo (chefe derrotado, etc).
+const estado = {
+    bossMorto: false
+};
+
+// ==========================================
+// CARREGAMENTO DE SALAS
+// ==========================================
+
+function carregarSala(nova) {
+    if (!nova) {
+        console.error("Tentativa de carregar uma sala inexistente.");
+
+        keys.l.pressed = false;
+        keys.e.pressed = false;
+        return;
+    }
+
+    sala = nova;
+
+    larguraMundo = sala.largura * sala.escala;
+
+    // Limpa as teclas para evitar movimento involuntário
+    // durante a transição.
+    keys.d.pressed = false;
+    keys.a.pressed = false;
+    keys.s.pressed = false;
+    keys.l.pressed = false;
+
+    // Carrega o cenário.
+    level.src = sala.cenario;
+
+    level.onload = () => {
+    console.log("Tamanho da imagem:", level.naturalWidth, level.naturalHeight);
+};
+    // Carrega o céu somente se a sala possuir um.
+    if (sala.ceu) {
+        sky.src = sala.ceu;
+    } else {
+        sky.removeAttribute("src");
+    }
+
+    // Reinicia a câmera.
+    camera.x = 0;
+
+    // Reinicia a lista de eventos da nova sala.
+    eventosAtivados.clear();
+
+    console.log("Sala carregada:", sala.cenario);
+}
+
+carregarSala(salas.tutorial);
+
+// ==========================================
+// EVENTOS E TROCA DE SALAS
+// ==========================================
+
 function verificarEventos() {
-    if (!sala.eventList) return;
+    if (!sala.eventList) return false;
 
     for (const evento of sala.eventList) {
-        // Verifica se o jogador chegou ao ponto do evento na horizontal
-        if (player.position.x >= evento.x) {
-            if (evento.acao === 'trocarSala') {
-                const destino = salas[evento.destino];
+        if (eventosAtivados.has(evento.id)) continue;
 
-                if (!destino) {
-                    console.error('Sala não encontrada:', evento.destino);
-                    continue;
-                }
+        // Evento com condição: só vale depois que ela for cumprida.
+        if (evento.condicao && !estado[evento.condicao]) continue;
 
-                console.log('Trocando de sala:', evento.destino);
+        if (evento.w !== undefined) {
+            // EVENTO EM ÁREA (porta): jogador dentro do retângulo
+            // e apertando E.
+            const dentro =
+                player.position.x < evento.x + evento.w &&
+                player.position.x + player.width > evento.x &&
+                player.position.y < evento.y + evento.h &&
+                player.position.y + player.height > evento.y;
 
-                // Carrega a nova sala (troca imagens e dados)
-                carregarSala(destino);
+            if (!dentro || !keys.e.pressed) continue;
+        } else {
+            // EVENTO EM LINHA (como o do corredor): só passar do x.
+            if (player.position.x + player.width < evento.x) continue;
+        }
 
-                // Posiciona o jogador na coordenada de spawn configurada
-                player.position.x = evento.spawn.x;
-                player.position.y = destino.floorY - player.height;
+        if (evento.acao === "trocarSala") {
+            const destino = salas[evento.destino];
 
-                // Zera as velocidades para evitar "arrastos" na nova sala
-                player.velocity.x = 0;
-                player.velocity.y = 0;
-
-                // Reinicia a posição da câmera
-                camera.x = 0;
-
-                // Impede que outros eventos da sala antiga sejam processados neste frame
-                return true;
+            if (!destino) {
+                console.error("Sala não encontrada:", evento.destino);
+                eventosAtivados.add(evento.id);
+                continue;
             }
+
+            console.log("Trocando de sala:", evento.destino);
+
+            eventosAtivados.add(evento.id);
+            carregarSala(destino);
+
+            // Posiciona o jogador na entrada da nova sala.
+            player.position.x = evento.spawn?.x ?? 0;
+            player.position.y =
+                evento.spawn?.y ?? destino.floorY - player.height;
+
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+
+            larguraMundo = destino.largura * destino.escala;
+            onGround = true;
+
+            return true;
         }
     }
 
     return false;
 }
 
-// Cria a instância do player principal
-const player = new Player({
-    position: { x: 0, y: 0 },
-    imageSrc: './img/spritesheet.png'
-})
+// ==========================================
+// DEPURAÇÃO: MOSTRAR COORDENADAS COM CLIQUE
+// ==========================================
 
-// Sala atual e as imagens de fundo/cenário dela
-let sala = salas.tutorial
-let larguraMundo = 0
-const sky = new Image()
-const level = new Image()
+canvas.addEventListener("click", (event) => {
+    const rect = canvas.getBoundingClientRect();
 
-// Carrega os dados e assets de uma nova sala
-function carregarSala(nova) {
-    sala = nova;
-    larguraMundo = sala.largura * sala.escala;
-    sky.src = sala.ceu || '';
-    level.src = sala.cenario;
-}
-carregarSala(salas.tutorial)
+    const x = Math.round(
+        (event.clientX - rect.left) *
+        canvas.width / rect.width +
+        camera.x
+    );
 
-// Estado atual das teclas de controle
-const keys = {
-    d: { pressed: false },
-    a: { pressed: false },
-    s: { pressed: false },
-    l: { pressed: false }
-}
+    const y = Math.round(
+        (event.clientY - rect.top) *
+        canvas.height / rect.height
+    );
 
-// Controla se o player está apoiado no chão ou em alguma superfície sólida
-let onGround = false
+    console.log("X:", x, "Y:", y);
+});
 
-// Configuração da câmera (acompanha o jogador apenas na horizontal)
-const camera = { x: 0 }
+// ==========================================
+// PARALLAX
+// ==========================================
 
-// Evento de clique para depuração (mostra coordenadas no console)
-canvas.addEventListener('click', (e) => {
-    const r = canvas.getBoundingClientRect()
-    const x = Math.round((e.clientX - r.left) * canvas.width / r.width + camera.x)
-    const y = Math.round((e.clientY - r.top) * canvas.height / r.height)
-    console.log(x, y)
-})
+const CEU_ESCALA = 3;
 
-// Armazena o timestamp do frame anterior para cálculo do Delta Time (dt)
-let lastTime = 0
-
-const CEU_ESCALA = 3   // sky.png tem 384x224, vira 1152x672
-
-// Desenha o fundo com efeito de paralaxe (o céu se move mais devagar que a câmera)
+// Desenha o céu repetido horizontalmente.
+// O fator de paralaxe é configurado em salas.js.
 function desenharCeu() {
-    if (!sky.complete || sky.naturalWidth === 0) return
-    if (!sala.ceu) return
-    const w = sky.naturalWidth * CEU_ESCALA
-    const h = sky.naturalHeight * CEU_ESCALA
+    if (!sala.ceu) return;
 
-    // Calcula o deslocamento horizontal do céu baseado no fator de paralaxe da sala
-    const offset = Math.round((camera.x * sala.ceuFator) % w)
+    if (!sky.complete || sky.naturalWidth === 0) {
+        return;
+    }
 
-    // Repete a imagem do céu lado a lado até preencher toda a largura da tela
-    for (let x = -offset; x < canvas.width; x += w) {
-        ctx.drawImage(sky, x, 0, w, h)
+    const largura = sky.naturalWidth * CEU_ESCALA;
+    const altura = sky.naturalHeight * CEU_ESCALA;
+
+    const fator = sala.ceuFator ?? 0.1;
+
+    // Movimento do céu mais lento que o cenário.
+    const deslocamento = camera.x * fator;
+
+    // Mantém o deslocamento dentro da largura da imagem.
+    const offset =
+        ((deslocamento % largura) + largura) % largura;
+
+    // Repete a imagem para evitar espaços vazios.
+    for (
+        let x = -Math.ceil(offset);
+        x < canvas.width;
+        x += largura
+    ) {
+        ctx.drawImage(
+            sky,
+            Math.round(x),
+            0,
+            largura,
+            altura
+        );
     }
 }
 
 // ==========================================
-// FUNÇÃO DEFINITIVA DE COLISÃO COM OS SÓLIDOS
+// DESENHAR CENÁRIO
 // ==========================================
-// Trata as colisões em 4 direções utilizando a posição anterior do player
-function resolverColisoes(anterior) {
+
+function desenharCenario() {
+    if (!level.complete || level.naturalWidth === 0) {
+        return;
+    }
+
+    const escala = sala.escala;
+    const recorte = sala.recorte;
+
+    if (!recorte || escala <= 0) {
+        return;
+    }
+
+    // Área visível da imagem original.
+    const larguraVisivel = canvas.width / escala;
+
+    // Limita a origem horizontal à imagem.
+    const origemX = Math.max(
+        0,
+        Math.min(
+            camera.x / escala,
+            level.naturalWidth - larguraVisivel
+        )
+    );
+
+    // Limita o recorte vertical à altura da imagem.
+    const origemY = Math.max(
+        0,
+        Math.min(
+            recorte.y,
+            level.naturalHeight
+        )
+    );
+
+    // Impede que o recorte ultrapasse o final da imagem.
+    const alturaDisponivel =
+        level.naturalHeight - origemY;
+
+    const alturaRecorte = Math.max(
+        0,
+        Math.min(
+            recorte.h,
+            alturaDisponivel
+        )
+    );
+
+    if (alturaRecorte <= 0) return;
+
+    // Largura disponível a partir da origem horizontal.
+    const larguraDisponivel =
+        level.naturalWidth - origemX;
+
+    const larguraRecorte = Math.max(
+        0,
+        Math.min(
+            larguraVisivel,
+            larguraDisponivel
+        )
+    );
+
+    if (larguraRecorte <= 0) return;
+
+    // Mantém o recorte alinhado à parte inferior do canvas.
+    const alturaDesenhada = alturaRecorte * escala;
+
+    const destinoY = canvas.height - alturaDesenhada;
+
+    ctx.drawImage(
+        level,
+
+        // Origem na imagem original.
+        origemX,
+        origemY,
+        larguraRecorte,
+        alturaRecorte,
+
+        // Destino no canvas.
+        0,
+        destinoY,
+        larguraRecorte * escala,
+        alturaDesenhada
+    );
+}
+
+// ==========================================
+// COLISÕES COM BLOCOS SÓLIDOS
+// ==========================================
+
+// As coordenadas dos sólidos devem estar no mesmo
+// sistema de coordenadas usado pelo jogador.
+//
+// A resolução horizontal e vertical é independente
+// para evitar atravessar paredes e plataformas.
+
+function resolverColisoesHorizontais(anterior) {
     if (!sala.solidos) return;
 
     for (const bloco of sala.solidos) {
         const esquerda = player.position.x;
         const direita = esquerda + player.width;
+
         const topo = player.position.y;
         const base = topo + player.height;
 
         const blocoDireita = bloco.x + bloco.w;
         const blocoBase = bloco.y + bloco.h;
 
-        // Verifica se os retângulos de colisão se sobrepõem no frame atual
-        const colide =
-            direita > bloco.x &&
-            esquerda < blocoDireita &&
+        // Precisa existir sobreposição vertical.
+        const sobrepoeY =
             base > bloco.y &&
             topo < blocoBase;
 
-        if (!colide) continue;
+        if (!sobrepoeY) continue;
 
-        const baseAnterior = anterior.y + player.height;
-        const direitaAnterior = anterior.x + player.width;
+        const direitaAnterior =
+            anterior.x + player.width;
 
-        // Caiu sobre o bloco (colisão por cima)
+        // Jogador andando para a direita.
         if (
-            player.velocity.y >= 0 &&
-            baseAnterior <= bloco.y
-        ) {
-            player.position.y = bloco.y - player.height;
-            player.velocity.y = 0;
-            onGround = true;
-        }
-        // Bateu a cabeça na parte inferior do bloco (colisão por baixo)
-        else if (
-            player.velocity.y < 0 &&
-            anterior.y >= blocoBase
-        ) {
-            player.position.y = blocoBase;
-            player.velocity.y = 0;
-        }
-        // Bateu na lateral esquerda do bloco (vindo da esquerda para a direita)
-        else if (
             player.velocity.x > 0 &&
+            direita > bloco.x &&
             direitaAnterior <= bloco.x
         ) {
-            player.position.x = bloco.x - player.width;
+            player.position.x =
+                bloco.x - player.width;
         }
-        // Bateu na lateral direita do bloco (vindo da direita para a esquerda)
+
+        // Jogador andando para a esquerda.
         else if (
             player.velocity.x < 0 &&
+            esquerda < blocoDireita &&
             anterior.x >= blocoDireita
         ) {
             player.position.x = blocoDireita;
@@ -178,162 +375,382 @@ function resolverColisoes(anterior) {
     }
 }
 
-// Loop principal de animação e lógica do jogo
+function resolverColisoesVerticais(anterior) {
+    if (!sala.solidos) return;
+
+    for (const bloco of sala.solidos) {
+        const esquerda = player.position.x;
+        const direita = esquerda + player.width;
+
+        const topo = player.position.y;
+        const base = topo + player.height;
+
+        const blocoDireita = bloco.x + bloco.w;
+        const blocoBase = bloco.y + bloco.h;
+
+        // Precisa existir sobreposição horizontal.
+        const sobrepoeX =
+            direita > bloco.x &&
+            esquerda < blocoDireita;
+
+        if (!sobrepoeX) continue;
+
+        const baseAnterior =
+            anterior.y + player.height;
+
+        // Caiu em cima do bloco.
+        if (
+            player.velocity.y >= 0 &&
+            base > bloco.y &&
+            baseAnterior <= bloco.y
+        ) {
+            player.position.y =
+                bloco.y - player.height;
+
+            player.velocity.y = 0;
+            onGround = true;
+        }
+
+        // Bateu a cabeça na parte inferior.
+        else if (
+            player.velocity.y < 0 &&
+            topo < blocoBase &&
+            anterior.y >= blocoBase
+        ) {
+            player.position.y = blocoBase;
+            player.velocity.y = 0;
+        }
+    }
+}
+
+// ==========================================
+// COLISÃO COM O CHÃO
+// ==========================================
+
+function resolverChao() {
+    if (
+        player.position.y + player.height >=
+        sala.floorY
+    ) {
+        player.position.y =
+            sala.floorY - player.height;
+
+        player.velocity.y = 0;
+        onGround = true;
+    }
+}
+
+// ==========================================
+// COLISÃO COM PLATAFORMAS
+// ==========================================
+
+function resolverPlataformas(anterior) {
+    if (!sala.platforms) return;
+
+    for (const plataforma of sala.platforms) {
+        const esquerda = player.position.x;
+        const direita = esquerda + player.width;
+
+        const base = player.position.y + player.height;
+        const baseAnterior =
+            anterior.y + player.height;
+
+        const dentroX =
+            direita > plataforma.x &&
+            esquerda < plataforma.x + plataforma.w;
+
+        // Só permite pousar por cima da plataforma.
+        if (
+            dentroX &&
+            player.velocity.y >= 0 &&
+            base >= plataforma.y &&
+            baseAnterior <= plataforma.y
+        ) {
+            player.position.y =
+                plataforma.y - player.height;
+
+            player.velocity.y = 0;
+            onGround = true;
+        }
+    }
+}
+
+// ==========================================
+// LIMITES DO MUNDO
+// ==========================================
+
+function limitarPosicao() {
+    player.position.x = Math.max(
+        0,
+        Math.min(
+            player.position.x,
+            Math.max(0, larguraMundo - player.width)
+        )
+    );
+}
+
+// ==========================================
+// CÂMERA
+// ==========================================
+
+function atualizarCamera() {
+    const escala = sala.escala;
+
+    camera.x =
+        player.position.x +
+        player.width / 2 -
+        canvas.width / 2;
+
+    camera.x = Math.max(
+        0,
+        Math.min(
+            camera.x,
+            Math.max(0, larguraMundo - canvas.width)
+        )
+    );
+
+    // Mantém o deslocamento alinhado à escala da sala.
+    camera.x = Math.round(camera.x / escala) * escala;
+}
+
+// ==========================================
+// LOOP PRINCIPAL
+// ==========================================
+
 function animate(timestamp) {
-    window.requestAnimationFrame(animate)
+    requestAnimationFrame(animate);
 
-    // Delta time: quantos "frames de 60fps" passaram desde o último frame
-    // (1 = 60fps normal, valores menores/maiores ajustam a fluidez). O limite de 50ms evita saltos caso a aba fique inativa.
-    const dt = Math.min(timestamp - lastTime, 50) / (1000 / 60)
-    lastTime = timestamp
+    // Delta time baseado em 60 FPS.
+    const dt =
+        Math.min(timestamp - lastTime, 50) /
+        (1000 / 60);
 
-    ctx.fillStyle = 'white'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    lastTime = timestamp;
 
-    // Movimento horizontal: Permite andar e atirar ao mesmo tempo (bloqueado apenas se estiver agachado)
+    // Limpa o canvas.
+    ctx.fillStyle = "black";
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    // --------------------------------------
+    // MOVIMENTAÇÃO HORIZONTAL
+    // --------------------------------------
+
     player.velocity.x = 0;
+
     if (!player.isCrouching) {
-        if (keys.d.pressed) player.velocity.x = 4;
-        else if (keys.a.pressed) player.velocity.x = -4;
+        if (keys.d.pressed) {
+            player.velocity.x = 10;
+        } else if (keys.a.pressed) {
+            player.velocity.x = -10;
+        }
     }
 
-    // Se estiver segurando a tecla L, dispara projéteis continuamente respeitando a cadência da arma
+    // --------------------------------------
+    // DISPARO
+    // --------------------------------------
+
     if (keys.l.pressed) {
         player.shoot(timestamp);
     }
 
-    // 1. Guarda a posição anterior do jogador antes de aplicar a movimentação
+    // --------------------------------------
+    // GUARDA A POSIÇÃO ANTERIOR
+    // --------------------------------------
+
     const anterior = {
         x: player.position.x,
         y: player.position.y
     };
 
-    // 2. Aplica a velocidade atual multiplicada pelo Delta Time nas coordenadas
-    player.position.x += player.velocity.x * dt;
-    player.position.y += player.velocity.y * dt;
+    // --------------------------------------
+    // MOVIMENTAÇÃO HORIZONTAL
+    // --------------------------------------
 
-    // 3. Executa a função definitiva de colisão com os blocos sólidos da sala
-    resolverColisoes(anterior);
+    player.position.x +=
+        player.velocity.x * dt;
 
-    // Limita o movimento do player às bordas horizontais do mundo da sala atual
-    player.position.x = Math.max(0, Math.min(player.position.x, larguraMundo - player.width))
+    resolverColisoesHorizontais(anterior);
 
-    // Reseta o estado de "no chão" antes de checar o piso e as plataformas
-    onGround = false
+    limitarPosicao();
 
-    // Colisão com o chão principal da sala
-    if (player.position.y + player.height >= sala.floorY) {
-        player.position.y = sala.floorY - player.height
-        player.velocity.y = 0
-        onGround = true
+    // --------------------------------------
+    // MOVIMENTAÇÃO VERTICAL
+    // --------------------------------------
+
+    // Reseta o estado antes de recalcular as colisões.
+    onGround = false;
+
+    player.position.y +=
+        player.velocity.y * dt;
+
+    resolverColisoesVerticais(anterior);
+
+    resolverChao();
+
+    resolverPlataformas(anterior);
+
+    // --------------------------------------
+    // GRAVIDADE
+    // --------------------------------------
+
+    if (!onGround) {
+        player.velocity.y += gravity * dt;
     }
 
-    // Colisão com as plataformas flutuantes da sala (permite subir por cima delas)
-    sala.platforms.forEach(p => {
-        const pe = player.position.y + player.height
-        const peAntes = pe - player.velocity.y * dt
-        const dentroX = player.position.x + player.width > p.x
-            && player.position.x < p.x + p.w
+    // --------------------------------------
+    // EVENTOS E TROCA DE SALAS
+    // --------------------------------------
 
-        if (dentroX && player.velocity.y >= 0 && peAntes <= p.y && pe >= p.y) {
-            player.position.y = p.y - player.height
-            player.velocity.y = 0
-            onGround = true
-        }
-    })
-
-    // Se não estiver apoiado em nenhuma superfície, aplica a aceleração da gravidade verticalmente
-    if (!onGround) player.velocity.y += gravity * dt
-
-    // Verifica se o jogador ativou algum evento (como transição de salas)
     verificarEventos();
 
-    // A câmera segue o player centralizado na tela, sem ultrapassar os limites da sala
-    const S = sala.escala
-    camera.x = player.position.x + player.width / 2 - canvas.width / 2
-    camera.x = Math.max(0, Math.min(camera.x, larguraMundo - canvas.width))
-    camera.x = Math.round(camera.x / S) * S
+    // Garante que o jogador não fique fora dos limites
+    // depois de uma eventual troca de sala.
+    limitarPosicao();
 
-    // Renderiza o plano de fundo (céu com paralaxe)
-    desenharCeu()
-    
-    // Renderiza o cenário recortado de acordo com a posição atual da câmera
-    const r = sala.recorte
-    ctx.drawImage(
-        level,
-        camera.x / S, r.y, canvas.width / S, r.h,                // Origem (coordenadas na imagem do cenário)
-        0, canvas.height - r.h * S, canvas.width, r.h * S        // Destino (coordenadas no canvas da tela)
-    )
+    // --------------------------------------
+    // ATUALIZA CÂMERA
+    // --------------------------------------
 
-    // Renderiza o player deslocado pela posição da câmera (ele vive nas coordenadas do mundo)
-    ctx.save()
-    ctx.translate(-camera.x, 0)
-    player.draw(ctx, timestamp, onGround)
-    ctx.restore()
+    atualizarCamera();
+
+    // --------------------------------------
+    // RENDERIZAÇÃO
+    // --------------------------------------
+
+    // 1. Fundo com paralaxe.
+    desenharCeu();
+
+    // 2. Cenário principal.
+    desenharCenario();
+
+    // 3. Jogador.
+    ctx.save();
+
+    ctx.translate(-camera.x, 0);
+
+    player.draw(
+        ctx,
+        timestamp,
+        onGround
+    );
+
+    ctx.restore();
 }
-// Inicia o loop de animação
-animate(0)
+
+// Inicia o jogo.
+requestAnimationFrame(animate);
 
 // ==========================================
-// EVENTOS DE ENTRADA DO TECLADO
+// EVENTOS DO TECLADO
 // ==========================================
-window.addEventListener('keydown', (event) => {
+
+window.addEventListener("keydown", (event) => {
     switch (event.key) {
-        case 'd':
-        case 'D':
-        case 'ArrowRight':
+        case "d":
+        case "D":
+        case "ArrowRight":
             keys.d.pressed = true;
             break;
-        case 'a':
-        case 'A':
-        case 'ArrowLeft':
+
+        case "a":
+        case "A":
+        case "ArrowLeft":
             keys.a.pressed = true;
             break;
-        case 's':
-        case 'S':
-        case 'ArrowDown':
-            if (onGround) {
+
+        case "s":
+        case "S":
+        case "ArrowDown":
+            if (onGround && !player.isCrouching) {
                 keys.s.pressed = true;
                 player.crouch();
             }
             break;
-        case 'l':
-        case 'L':
+
+        case "l":
+        case "L":
             keys.l.pressed = true;
             break;
-        case 'w':
-        case 'W':
-        case 'ArrowUp':
-        case ' ':
-            // Pula somente se estiver no chão e não estiver agachado
-            if (onGround && !player.isCrouching) {
-                player.velocity.y = -12.5;
+
+            case "e":
+            case "E":
+        // event.repeat evita que segurar a tecla dispare várias vezes.
+        if (!event.repeat) keys.e.pressed = true;
+        break;
+
+        // TESTE TEMPORÁRIO: simula o boss morrendo. Apaga depois.
+        case "k":
+        estado.bossMorto = true;
+        console.log("Boss morto!");
+        break;
+
+        case "w":
+        case "W":
+        case "ArrowUp":
+        case " ":
+            event.preventDefault();
+
+            if (
+                onGround &&
+                !player.isCrouching
+            ) {
+                player.velocity.y = -15;
+                onGround = false;
             }
             break;
     }
-})
+});
 
-window.addEventListener('keyup', (event) => {
+// ==========================================
+// SOLTAR TECLAS
+// ==========================================
+
+window.addEventListener("keyup", (event) => {
     switch (event.key) {
-        case 'd':
-        case 'D':
-        case 'ArrowRight':
+        case "d":
+        case "D":
+        case "ArrowRight":
             keys.d.pressed = false;
             break;
-        case 'a':
-        case 'A':
-        case 'ArrowLeft':
+
+        case "a":
+        case "A":
+        case "ArrowLeft":
             keys.a.pressed = false;
             break;
-        case 's':
-        case 'S':
-        case 'ArrowDown':
+
+        case "s":
+        case "S":
+        case "ArrowDown":
             keys.s.pressed = false;
             player.standUp();
             break;
-        case 'l':
-        case 'L':
+
+        case "l":
+        case "L":
             keys.l.pressed = false;
             break;
+
+            case "e":
+        case "E":
+        keys.e.pressed = false;
+        break;
     }
-})
+});
+
+// Evita que o personagem continue andando ou atirando
+// caso a janela perca o foco enquanto uma tecla está pressionada.
+window.addEventListener("blur", () => {
+    keys.d.pressed = false;
+    keys.a.pressed = false;
+    keys.s.pressed = false;
+    keys.l.pressed = false;
+    keys.e.pressed = false;
+    
+    player.standUp();
+});

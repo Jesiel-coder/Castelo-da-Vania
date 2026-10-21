@@ -21,15 +21,38 @@ export const salas = {
         ],
         eventList: [
             {
-                id: 'irParaPonte',
+                id: 'irParaCorredor',
                 x: 5040,
                 acao: 'trocarSala',
-                destino: 'ponte',
-                spawn: { x: 83, },
+                destino: 'corredor',
+                spawn: { x: 0, },
             },
         ],
     },
 
+    corredor: {
+    ceu: './img/sky.png',
+    ceuFator: 0.1,
+    cenario: './img/castleCorridor.png',
+    escala: 1,
+    recorte: { y: 481, h: 576 },
+    largura: 2209,
+    floorY: 511,
+    platforms: [
+        { x: 1025, y: 414, w: 160, h: 25 },
+        { x: 1025, y: 190, w: 160, h: 25 },
+    ],
+    solidos: [],
+    eventList: [
+         {
+                id: 'irParaponte',
+                x: 2120,
+                acao: 'trocarSala',
+                destino: 'ponte',
+                spawn: { x: 50, },
+            },
+    ],
+},
     ponte: {
         ceu: './img/sky.png',
         ceuFator: 0.1,
@@ -54,6 +77,61 @@ export const salas = {
     // Parede direita da torre
     { x: 1488, y: 0, w: 100, h: 541 },
         ],
-        eventList: [],
+        eventList: [
+    {
+        id: 'portaEsquerda',            // → corredor
+        x: 48, y: 444, w: 90, h: 87,
+        acao: 'trocarSala',
+        destino: 'corredor',
+        spawn: { x: 2000 },
     },
+    {
+        id: 'portaBaixo',               // → boss
+        x: 1392, y: 444, w: 90, h: 87,
+        acao: 'trocarSala',
+        destino: 'boss',
+        spawn: { x: 40 },
+    },
+    {
+        id: 'portaCima',                // → final
+        x: 1392, y: 156, w: 90, h: 87,
+        acao: 'trocarSala',
+        destino: 'final',
+        spawn: { x: 0 },
+    },
+    ],
+    },
+    boss: {
+    ceu: './img/sky.png',
+    ceuFator: 0.1,
+    cenario: './img/BossRoom.png',
+    escala: 1.5,
+    recorte: { y: 481, h: 576 },
+    largura: 1024,
+    floorY: 527,
+    platforms: [],
+    solidos: [],
+    eventList: [
+    {
+        id: 'saidaBoss',
+        x: 0, y: 440, w: 96, h: 90,
+        acao: 'trocarSala',
+        destino: 'ponte',
+        spawn: { x: 1420 },
+        condicao: 'bossMorto',
+    },
+    ],
+},
+    final: {
+    ceu: './img/sky.png',
+    ceuFator: 0.1,
+    cenario: './img/finalRoom.png',
+    escala: 1.7,
+    recorte: { y: 0, h: 512 },
+    largura: 800,
+    floorY: 522,
+    platforms: [],
+    solidos: [],
+    eventList: [],
+},
 };
