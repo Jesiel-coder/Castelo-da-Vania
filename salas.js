@@ -97,7 +97,7 @@ export const salas = {
         x: 1392, y: 156, w: 90, h: 87,
         acao: 'trocarSala',
         destino: 'final',
-        spawn: { x: 0 },
+        spawn: { x: 240 },
     },
     ],
     },

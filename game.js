@@ -69,9 +69,6 @@ const estado = {
 function carregarSala(nova) {
     if (!nova) {
         console.error("Tentativa de carregar uma sala inexistente.");
-
-        keys.l.pressed = false;
-        keys.e.pressed = false;
         return;
     }
 
@@ -85,6 +82,7 @@ function carregarSala(nova) {
     keys.a.pressed = false;
     keys.s.pressed = false;
     keys.l.pressed = false;
+    keys.e.pressed = false;
 
     // Carrega o cenário.
     level.src = sala.cenario;
@@ -544,9 +542,9 @@ function animate(timestamp) {
 
     if (!player.isCrouching) {
         if (keys.d.pressed) {
-            player.velocity.x = 10;
+            player.velocity.x = 4;
         } else if (keys.a.pressed) {
-            player.velocity.x = -10;
+            player.velocity.x = -4;
         }
     }
 
@@ -699,7 +697,7 @@ window.addEventListener("keydown", (event) => {
                 onGround &&
                 !player.isCrouching
             ) {
-                player.velocity.y = -15;
+                player.velocity.y = -12.7;
                 onGround = false;
             }
             break;
