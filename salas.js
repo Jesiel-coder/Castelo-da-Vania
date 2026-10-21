@@ -17,7 +17,7 @@ export const salas = {
 
             //chão
             { x: 0, y: 500, w: 835, h: 30 },
-            { x: 1346, y: 500, w: 3690, h: 20 },
+            { x: 1346, y: 500, w: 3752, h: 20 },
         ],
 
         solidos: [
@@ -36,7 +36,7 @@ export const salas = {
         eventList: [
             {
                 id: 'irParaCorredor',
-                x: 5070, y: 500, w: 50, h: 50,
+                x: 5070,
                 acao: 'trocarSala',
                 destino: 'corredor',
                 spawn: { x: 0, },
