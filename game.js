@@ -7,17 +7,17 @@ const ctx = canvas.getContext('2d')
 canvas.width = 1024
 canvas.height = 576
 
-ctx.imageSmoothingEnabled = false   // sem isso o pixel art fica borrado ao escalar
+ctx.imageSmoothingEnabled = false   // Sem isso o pixel art fica borrado ao escalar
 
-//gravidade
+// Gravidade aplicada ao mundo
 const gravity = 0.5
 
-// Verifica os eventos da sala atual
+// Verifica os eventos da sala atual (como troca de salas, portas, etc.)
 function verificarEventos() {
     if (!sala.eventList) return;
 
     for (const evento of sala.eventList) {
-        // Verifica se o jogador chegou ao ponto do evento
+        // Verifica se o jogador chegou ao ponto do evento na horizontal
         if (player.position.x >= evento.x) {
             if (evento.acao === 'trocarSala') {
                 const destino = salas[evento.destino];
@@ -29,21 +29,21 @@ function verificarEventos() {
 
                 console.log('Trocando de sala:', evento.destino);
 
-                // Carrega a nova sala
+                // Carrega a nova sala (troca imagens e dados)
                 carregarSala(destino);
 
-                // Posiciona o jogador na entrada
+                // Posiciona o jogador na coordenada de spawn configurada
                 player.position.x = evento.spawn.x;
                 player.position.y = destino.floorY - player.height;
 
-                // Zera a velocidade
+                // Zera as velocidades para evitar "arrastos" na nova sala
                 player.velocity.x = 0;
                 player.velocity.y = 0;
 
-                // Reinicia a câmera
+                // Reinicia a posição da câmera
                 camera.x = 0;
 
-                // Impede que outros eventos da sala antiga sejam processados
+                // Impede que outros eventos da sala antiga sejam processados neste frame
                 return true;
             }
         }
@@ -52,19 +52,19 @@ function verificarEventos() {
     return false;
 }
 
-//cria o player
+// Cria a instância do player principal
 const player = new Player({
     position: { x: 0, y: 0 },
     imageSrc: './img/spritesheet.png'
 })
 
-//sala atual e as imagens dela
+// Sala atual e as imagens de fundo/cenário dela
 let sala = salas.tutorial
 let larguraMundo = 0
 const sky = new Image()
 const level = new Image()
 
-//carrega uma sala (troca as imagens)
+// Carrega os dados e assets de uma nova sala
 function carregarSala(nova) {
     sala = nova;
     larguraMundo = sala.largura * sala.escala;
@@ -73,7 +73,7 @@ function carregarSala(nova) {
 }
 carregarSala(salas.tutorial)
 
-//teclas apertadas
+// Estado atual das teclas de controle
 const keys = {
     d: { pressed: false },
     a: { pressed: false },
@@ -81,12 +81,13 @@ const keys = {
     l: { pressed: false }
 }
 
-//se o player está no chão (pra poder pular)
+// Controla se o player está apoiado no chão ou em alguma superfície sólida
 let onGround = false
 
-//câmera (só anda na horizontal)
+// Configuração da câmera (acompanha o jogador apenas na horizontal)
 const camera = { x: 0 }
 
+// Evento de clique para depuração (mostra coordenadas no console)
 canvas.addEventListener('click', (e) => {
     const r = canvas.getBoundingClientRect()
     const x = Math.round((e.clientX - r.left) * canvas.width / r.width + camera.x)
@@ -94,102 +95,143 @@ canvas.addEventListener('click', (e) => {
     console.log(x, y)
 })
 
-//tempo do frame anterior (pro delta time)
+// Armazena o timestamp do frame anterior para cálculo do Delta Time (dt)
 let lastTime = 0
 
 const CEU_ESCALA = 3   // sky.png tem 384x224, vira 1152x672
 
+// Desenha o fundo com efeito de paralaxe (o céu se move mais devagar que a câmera)
 function desenharCeu() {
     if (!sky.complete || sky.naturalWidth === 0) return
     if (!sala.ceu) return
     const w = sky.naturalWidth * CEU_ESCALA
     const h = sky.naturalHeight * CEU_ESCALA
 
-    // quanto o céu já andou, "dando a volta" a cada largura da imagem
+    // Calcula o deslocamento horizontal do céu baseado no fator de paralaxe da sala
     const offset = Math.round((camera.x * sala.ceuFator) % w)
 
-    // repete lado a lado até preencher a tela
+    // Repete a imagem do céu lado a lado até preencher toda a largura da tela
     for (let x = -offset; x < canvas.width; x += w) {
         ctx.drawImage(sky, x, 0, w, h)
     }
 }
 
-//animação no canvas
+// ==========================================
+// FUNÇÃO DEFINITIVA DE COLISÃO COM OS SÓLIDOS
+// ==========================================
+// Trata as colisões em 4 direções utilizando a posição anterior do player
+function resolverColisoes(anterior) {
+    if (!sala.solidos) return;
+
+    for (const bloco of sala.solidos) {
+        const esquerda = player.position.x;
+        const direita = esquerda + player.width;
+        const topo = player.position.y;
+        const base = topo + player.height;
+
+        const blocoDireita = bloco.x + bloco.w;
+        const blocoBase = bloco.y + bloco.h;
+
+        // Verifica se os retângulos de colisão se sobrepõem no frame atual
+        const colide =
+            direita > bloco.x &&
+            esquerda < blocoDireita &&
+            base > bloco.y &&
+            topo < blocoBase;
+
+        if (!colide) continue;
+
+        const baseAnterior = anterior.y + player.height;
+        const direitaAnterior = anterior.x + player.width;
+
+        // Caiu sobre o bloco (colisão por cima)
+        if (
+            player.velocity.y >= 0 &&
+            baseAnterior <= bloco.y
+        ) {
+            player.position.y = bloco.y - player.height;
+            player.velocity.y = 0;
+            onGround = true;
+        }
+        // Bateu a cabeça na parte inferior do bloco (colisão por baixo)
+        else if (
+            player.velocity.y < 0 &&
+            anterior.y >= blocoBase
+        ) {
+            player.position.y = blocoBase;
+            player.velocity.y = 0;
+        }
+        // Bateu na lateral esquerda do bloco (vindo da esquerda para a direita)
+        else if (
+            player.velocity.x > 0 &&
+            direitaAnterior <= bloco.x
+        ) {
+            player.position.x = bloco.x - player.width;
+        }
+        // Bateu na lateral direita do bloco (vindo da direita para a esquerda)
+        else if (
+            player.velocity.x < 0 &&
+            anterior.x >= blocoDireita
+        ) {
+            player.position.x = blocoDireita;
+        }
+    }
+}
+
+// Loop principal de animação e lógica do jogo
 function animate(timestamp) {
     window.requestAnimationFrame(animate)
 
-    //delta time: quantos "frames de 60fps" passaram desde o último frame
-    //(1 = 60fps, 0.6 = 100fps). O limite de 50ms evita saltos quando a aba fica em segundo plano
-    const dt = Math.min(timestamp - lastTime, 50) / (1000 / 60)   //←
-    lastTime = timestamp                                           //←
+    // Delta time: quantos "frames de 60fps" passaram desde o último frame
+    // (1 = 60fps normal, valores menores/maiores ajustam a fluidez). O limite de 50ms evita saltos caso a aba fique inativa.
+    const dt = Math.min(timestamp - lastTime, 50) / (1000 / 60)
+    lastTime = timestamp
 
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Movimento horizontal: Agora permite andar E atirar ao mesmo tempo! (apenas bloqueia se agachado)
+    // Movimento horizontal: Permite andar e atirar ao mesmo tempo (bloqueado apenas se estiver agachado)
     player.velocity.x = 0;
     if (!player.isCrouching) {
         if (keys.d.pressed) player.velocity.x = 4;
         else if (keys.a.pressed) player.velocity.x = -4;
     }
 
-    // Se estiver segurando a tecla L, tenta disparar continuamente respeitando a cadência
+    // Se estiver segurando a tecla L, dispara projéteis continuamente respeitando a cadência da arma
     if (keys.l.pressed) {
         player.shoot(timestamp);
     }
 
-    player.position.x += player.velocity.x * dt   //←
-    player.position.y += player.velocity.y * dt   //←
+    // 1. Guarda a posição anterior do jogador antes de aplicar a movimentação
+    const anterior = {
+        x: player.position.x,
+        y: player.position.y
+    };
 
-    // Colisão horizontal com paredes sólidas
-if (sala.solidos) {
-    for (const parede of sala.solidos) {
-        const esquerda = player.position.x;
-        const direita = esquerda + player.width;
-        const topo = player.position.y;
-        const base = topo + player.height;
+    // 2. Aplica a velocidade atual multiplicada pelo Delta Time nas coordenadas
+    player.position.x += player.velocity.x * dt;
+    player.position.y += player.velocity.y * dt;
 
-        // Verifica se o jogador está na altura da parede
-        const sobrepoeY =
-            base > parede.y &&
-            topo < parede.y + parede.h;
+    // 3. Executa a função definitiva de colisão com os blocos sólidos da sala
+    resolverColisoes(anterior);
 
-        if (!sobrepoeY) continue;
-
-        // Impede atravessar a parede pela direita
-        if (
-            player.velocity.x > 0 &&
-            direita > parede.x &&
-            esquerda < parede.x + parede.w
-        ) {
-            player.position.x = parede.x - player.width;
-        }
-
-        // Impede atravessar a parede pela esquerda
-        if (
-            player.velocity.x < 0 &&
-            esquerda < parede.x + parede.w &&
-            direita > parede.x
-        ) {
-            player.position.x = parede.x + parede.w;
-        }
-    }
-}
+    // Limita o movimento do player às bordas horizontais do mundo da sala atual
     player.position.x = Math.max(0, Math.min(player.position.x, larguraMundo - player.width))
 
+    // Reseta o estado de "no chão" antes de checar o piso e as plataformas
     onGround = false
 
-    // Colisão com o chão principal
-    if (player.position.y + player.height >= sala.floorY) {   //←
-        player.position.y = sala.floorY - player.height        //←
+    // Colisão com o chão principal da sala
+    if (player.position.y + player.height >= sala.floorY) {
+        player.position.y = sala.floorY - player.height
         player.velocity.y = 0
         onGround = true
     }
 
-    // Colisão com as plataformas
-    sala.platforms.forEach(p => {                              //←
+    // Colisão com as plataformas flutuantes da sala (permite subir por cima delas)
+    sala.platforms.forEach(p => {
         const pe = player.position.y + player.height
-        const peAntes = pe - player.velocity.y * dt            //←
+        const peAntes = pe - player.velocity.y * dt
         const dentroX = player.position.x + player.width > p.x
             && player.position.x < p.x + p.w
 
@@ -200,35 +242,41 @@ if (sala.solidos) {
         }
     })
 
-    if (!onGround) player.velocity.y += gravity * dt   //←
+    // Se não estiver apoiado em nenhuma superfície, aplica a aceleração da gravidade verticalmente
+    if (!onGround) player.velocity.y += gravity * dt
 
+    // Verifica se o jogador ativou algum evento (como transição de salas)
     verificarEventos();
-    //câmera segue o player, sem passar das bordas da sala
+
+    // A câmera segue o player centralizado na tela, sem ultrapassar os limites da sala
     const S = sala.escala
     camera.x = player.position.x + player.width / 2 - canvas.width / 2
     camera.x = Math.max(0, Math.min(camera.x, larguraMundo - canvas.width))
     camera.x = Math.round(camera.x / S) * S
 
-    //céu: anda só 10% da câmera
+    // Renderiza o plano de fundo (céu com paralaxe)
     desenharCeu()
     
-    //cenário: recorta a faixa na posição da câmera
+    // Renderiza o cenário recortado de acordo com a posição atual da câmera
     const r = sala.recorte
     ctx.drawImage(
         level,
-        camera.x / S, r.y, canvas.width / S, r.h,                 // origem (imagem)
-        0, canvas.height - r.h * S, canvas.width, r.h * S         // destino (canvas)
+        camera.x / S, r.y, canvas.width / S, r.h,                // Origem (coordenadas na imagem do cenário)
+        0, canvas.height - r.h * S, canvas.width, r.h * S        // Destino (coordenadas no canvas da tela)
     )
 
-    //player: desenhado deslocado pela câmera (ele vive nas coordenadas do mundo)
+    // Renderiza o player deslocado pela posição da câmera (ele vive nas coordenadas do mundo)
     ctx.save()
     ctx.translate(-camera.x, 0)
     player.draw(ctx, timestamp, onGround)
     ctx.restore()
 }
+// Inicia o loop de animação
 animate(0)
 
-// Eventos de Teclado
+// ==========================================
+// EVENTOS DE ENTRADA DO TECLADO
+// ==========================================
 window.addEventListener('keydown', (event) => {
     switch (event.key) {
         case 'd':
@@ -259,7 +307,7 @@ window.addEventListener('keydown', (event) => {
         case ' ':
             // Pula somente se estiver no chão e não estiver agachado
             if (onGround && !player.isCrouching) {
-                player.velocity.y = -11.7;
+                player.velocity.y = -12.5;
             }
             break;
     }
@@ -283,7 +331,6 @@ window.addEventListener('keyup', (event) => {
             keys.s.pressed = false;
             player.standUp();
             break;
-
         case 'l':
         case 'L':
             keys.l.pressed = false;
