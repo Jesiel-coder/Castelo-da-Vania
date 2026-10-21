@@ -119,14 +119,22 @@ export class Player {
 
         const anim = this.animations[this.currentAnimation];
 
-        if (this.isShooting && this.currentAnimation === 'shoot') {
-            if (this.frameX >= anim.frames - 1) {
-                this.isShooting = false;
-                if (this.ammo <= 0 && !this.isReloading) {
-                    this.startReload(timestamp);
-                }
-            }
+    if (
+        this.isShooting &&
+        (this.currentAnimation === 'shoot' ||
+         this.currentAnimation === 'walkShoot')
+    ) {
+    const anim = this.animations[this.currentAnimation];
+
+    if (this.frameX >= anim.frames - 1) {
+        this.isShooting = false;
+
+        if (this.ammo <= 0 && !this.isReloading) {
+            this.startReload(timestamp);
         }
+    }
+}
+
 
         // Prioridade visual atualizada com as duas fases do pulo:
         let next = 'idle';

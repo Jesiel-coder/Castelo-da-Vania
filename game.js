@@ -8,8 +8,6 @@ import { salas } from "./salas.js";
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-document.querySelector("canvas").getBoundingClientRect()
-
 canvas.width = 1024;
 canvas.height = 576;
 
@@ -37,11 +35,136 @@ let larguraMundo = sala.largura * sala.escala;
 const sky = new Image();
 const level = new Image();
 
+// Imagem da tela final
+const telaFinalImg = new Image();
+telaFinalImg.src = "./img/thanks.png";
+
+const menuImg = new Image();
+menuImg.src = "./img/menu_bg.png";
+
+const gameOverImg = new Image();
+gameOverImg.src = "./img/gameover_bg.png";
+
 const camera = { x: 0 };
 
 let onGround = false;
 let pulosUsados = 0;
 let lastTime = 0;
+let vida = 6;
+const vidaMax = 6;
+let invulneravelAte = 0;
+const tiros = [];
+
+// ==========================================
+// TOCHAS E ESCURIDÃO (OTIMIZADO)
+// ==========================================
+
+const tochas = [
+    { x: 2096, y: 336 },
+    { x: 1617, y: 343 },
+    { x: 1203, y: 338 },
+    { x: 1007, y: 339 },
+    { x: 590, y: 336 },
+    { x: 113, y: 344 }
+];
+
+const canvasEscuridao = document.createElement("canvas");
+canvasEscuridao.width = canvas.width;
+canvasEscuridao.height = canvas.height;
+const ctxEscuridao = canvasEscuridao.getContext("2d");
+
+function dispararTiro() {
+    // Impede o disparo durante a recarga
+    if (player.isReloading) return;
+
+    const timestamp = performance.now();
+
+    // O método shoot controla a animação e a munição
+    if (!player.shoot(timestamp)) return;
+
+    const velocidade = 9;
+    const tamanho = 8;
+
+    tiros.push({
+        x: player.facingRight
+            ? player.position.x + player.width
+            : player.position.x - tamanho,
+
+        y: player.position.y + player.height * 0.45,
+
+        vx: player.facingRight ? velocidade : -velocidade,
+        tamanho: tamanho
+    });
+}
+
+function atualizarTiros() {
+    for (let i = tiros.length - 1; i >= 0; i--) {
+        const tiro = tiros[i];
+
+        // Guarda a posição anterior
+        const xAnterior = tiro.x;
+
+        // Move o projétil
+        tiro.x += tiro.vx;
+
+        // Verifica se saiu dos limites do mundo
+        if (tiro.x < 0 || tiro.x > larguraMundo) {
+            tiros.splice(i, 1);
+            continue;
+        }
+
+        let colidiu = false;
+
+        // Verifica colisão com plataformas
+        if (sala.platforms) {
+            for (const plataforma of sala.platforms) {
+                if (
+                    tiro.x + tiro.tamanho > plataforma.x &&
+                    tiro.x < plataforma.x + plataforma.w &&
+                    tiro.y + 4 > plataforma.y &&
+                    tiro.y < plataforma.y + plataforma.h
+                ) {
+                    colidiu = true;
+                    break;
+                }
+            }
+        }
+
+        // Verifica colisão com blocos sólidos
+        if (!colidiu && sala.solidos) {
+            for (const bloco of sala.solidos) {
+                if (
+                    tiro.x + tiro.tamanho > bloco.x &&
+                    tiro.x < bloco.x + bloco.w &&
+                    tiro.y + 4 > bloco.y &&
+                    tiro.y < bloco.y + bloco.h
+                ) {
+                    colidiu = true;
+                    break;
+                }
+            }
+        }
+
+        // Remove o tiro ao colidir com um obstáculo
+        if (colidiu) {
+            tiros.splice(i, 1);
+        }
+    }
+}  
+
+
+function desenharTiros() {
+    ctx.fillStyle = "#ffcc00";
+
+    for (const tiro of tiros) {
+        ctx.fillRect(
+            tiro.x - camera.x,
+            tiro.y,
+            tiro.tamanho,
+            4
+        );
+    }
+}
 
 // Evita processar o mesmo evento várias vezes.
 const eventosAtivados = new Set();
@@ -58,11 +181,21 @@ const keys = {
     e: { pressed: false }
 };
 
-// Guarda coisas que já aconteceram no jogo (chefe derrotado, etc).
+let opcaoGameOver = 0;
+// 0 = Reiniciar
+// 1 = Menu Principal
+
+// Guarda coisas que já aconteceram no jogo (chefe derrotado, tela final, etc).
 const estado = {
+    menu: true,        // Começa no menu inicial
     bossMorto: false,
-    puloDuplo: false
+    puloDuplo: false,
+    morreu: false,     // Novo estado para game over
+    fim: false
 };
+
+// Para depuração no console do navegador
+window.estado = estado;
 
 // ==========================================
 // CARREGAMENTO DE SALAS
@@ -78,8 +211,7 @@ function carregarSala(nova) {
 
     larguraMundo = sala.largura * sala.escala;
 
-    // Limpa as teclas para evitar movimento involuntário
-    // durante a transição.
+    // Limpa as teclas para evitar movimento involuntário durante a transição.
     keys.d.pressed = false;
     keys.a.pressed = false;
     keys.s.pressed = false;
@@ -92,6 +224,7 @@ function carregarSala(nova) {
     level.onload = () => {
         console.log("Tamanho da imagem:", level.naturalWidth, level.naturalHeight);
     };
+
     // Carrega o céu somente se a sala possuir um.
     if (sala.ceu) {
         sky.src = sala.ceu;
@@ -111,7 +244,7 @@ function carregarSala(nova) {
 carregarSala(salas.tutorial);
 
 // ==========================================
-// EVENTOS E TROCA DE SALAS
+// EVENTOS E TROCA DE SALAS / TELA FINAL
 // ==========================================
 
 function verificarEventos() {
@@ -124,8 +257,7 @@ function verificarEventos() {
         if (evento.condicao && !estado[evento.condicao]) continue;
 
         if (evento.w !== undefined) {
-            // EVENTO EM ÁREA (porta): jogador dentro do retângulo
-            // e apertando E.
+            // EVENTO EM ÁREA (como o baú ou portas): jogador dentro do retângulo e apertando E.
             const dentro =
                 player.position.x < evento.x + evento.w &&
                 player.position.x + player.width > evento.x &&
@@ -138,6 +270,14 @@ function verificarEventos() {
             if (player.position.x + player.width < evento.x) continue;
         }
 
+        // Ativa a Tela Final (Baú)
+        if (evento.acao === "telaFinal") {
+            eventosAtivados.add(evento.id);
+            estado.fim = true;
+            return true;
+        }
+
+        // Transição de Sala
         if (evento.acao === "trocarSala") {
             const destino = salas[evento.destino];
 
@@ -197,8 +337,6 @@ canvas.addEventListener("click", (event) => {
 
 const CEU_ESCALA = 3;
 
-// Desenha o céu repetido horizontalmente.
-// O fator de paralaxe é configurado em salas.js.
 function desenharCeu() {
     if (!sala.ceu) return;
 
@@ -211,14 +349,11 @@ function desenharCeu() {
 
     const fator = sala.ceuFator ?? 0.1;
 
-    // Movimento do céu mais lento que o cenário.
     const deslocamento = camera.x * fator;
 
-    // Mantém o deslocamento dentro da largura da imagem.
     const offset =
         ((deslocamento % largura) + largura) % largura;
 
-    // Repete a imagem para evitar espaços vazios.
     for (
         let x = -Math.ceil(offset);
         x < canvas.width;
@@ -250,10 +385,8 @@ function desenharCenario() {
         return;
     }
 
-    // Área visível da imagem original.
     const larguraVisivel = canvas.width / escala;
 
-    // Limita a origem horizontal à imagem.
     const origemX = Math.max(
         0,
         Math.min(
@@ -262,7 +395,6 @@ function desenharCenario() {
         )
     );
 
-    // Limita o recorte vertical à altura da imagem.
     const origemY = Math.max(
         0,
         Math.min(
@@ -271,7 +403,6 @@ function desenharCenario() {
         )
     );
 
-    // Impede que o recorte ultrapasse o final da imagem.
     const alturaDisponivel =
         level.naturalHeight - origemY;
 
@@ -285,7 +416,6 @@ function desenharCenario() {
 
     if (alturaRecorte <= 0) return;
 
-    // Largura disponível a partir da origem horizontal.
     const larguraDisponivel =
         level.naturalWidth - origemX;
 
@@ -299,21 +429,16 @@ function desenharCenario() {
 
     if (larguraRecorte <= 0) return;
 
-    // Mantém o recorte alinhado à parte inferior do canvas.
     const alturaDesenhada = alturaRecorte * escala;
 
     const destinoY = canvas.height - alturaDesenhada;
 
     ctx.drawImage(
         level,
-
-        // Origem na imagem original.
         origemX,
         origemY,
         larguraRecorte,
         alturaRecorte,
-
-        // Destino no canvas.
         0,
         destinoY,
         larguraRecorte * escala,
@@ -324,12 +449,6 @@ function desenharCenario() {
 // ==========================================
 // COLISÕES COM BLOCOS SÓLIDOS
 // ==========================================
-
-// As coordenadas dos sólidos devem estar no mesmo
-// sistema de coordenadas usado pelo jogador.
-//
-// A resolução horizontal e vertical é independente
-// para evitar atravessar paredes e plataformas.
 
 function resolverColisoesHorizontais(anterior) {
     if (!sala.solidos) return;
@@ -344,7 +463,6 @@ function resolverColisoesHorizontais(anterior) {
         const blocoDireita = bloco.x + bloco.w;
         const blocoBase = bloco.y + bloco.h;
 
-        // Precisa existir sobreposição vertical.
         const sobrepoeY =
             base > bloco.y &&
             topo < blocoBase;
@@ -354,7 +472,6 @@ function resolverColisoesHorizontais(anterior) {
         const direitaAnterior =
             anterior.x + player.width;
 
-        // Jogador andando para a direita.
         if (
             player.velocity.x > 0 &&
             direita > bloco.x &&
@@ -362,10 +479,7 @@ function resolverColisoesHorizontais(anterior) {
         ) {
             player.position.x =
                 bloco.x - player.width;
-        }
-
-        // Jogador andando para a esquerda.
-        else if (
+        } else if (
             player.velocity.x < 0 &&
             esquerda < blocoDireita &&
             anterior.x >= blocoDireita
@@ -388,7 +502,6 @@ function resolverColisoesVerticais(anterior) {
         const blocoDireita = bloco.x + bloco.w;
         const blocoBase = bloco.y + bloco.h;
 
-        // Precisa existir sobreposição horizontal.
         const sobrepoeX =
             direita > bloco.x &&
             esquerda < blocoDireita;
@@ -398,7 +511,6 @@ function resolverColisoesVerticais(anterior) {
         const baseAnterior =
             anterior.y + player.height;
 
-        // Caiu em cima do bloco.
         if (
             player.velocity.y >= 0 &&
             base > bloco.y &&
@@ -409,10 +521,7 @@ function resolverColisoesVerticais(anterior) {
 
             player.velocity.y = 0;
             onGround = true;
-        }
-
-        // Bateu a cabeça na parte inferior.
-        else if (
+        } else if (
             player.velocity.y < 0 &&
             topo < blocoBase &&
             anterior.y >= blocoBase
@@ -459,7 +568,6 @@ function resolverPlataformas(anterior) {
             direita > plataforma.x &&
             esquerda < plataforma.x + plataforma.w;
 
-        // Só permite pousar por cima da plataforma.
         if (
             dentroX &&
             player.velocity.y >= 0 &&
@@ -509,8 +617,229 @@ function atualizarCamera() {
         )
     );
 
-    // Mantém o deslocamento alinhado à escala da sala.
     camera.x = Math.round(camera.x / escala) * escala;
+}
+
+// ==========================================
+// DANO, ESPINHOS E RESPAWN
+// ==========================================
+
+function reposicionarNoRespawn() {
+    const r = sala.respawn ?? { x: 0, y: sala.floorY };
+
+    player.position.x = r.x;
+    player.position.y = r.y - player.height;
+    player.velocity.x = 0;
+    player.velocity.y = 0;
+}
+
+function sofrerDano(timestamp) {
+    if (timestamp < invulneravelAte) return;
+
+    vida--;
+    invulneravelAte = timestamp + 1500;
+
+    if (vida <= 0) {
+        console.log("Game Over!");
+        estado.morreu = true;
+        return;
+    }
+
+    reposicionarNoRespawn();
+}
+
+function verificarEspinhos(timestamp, dt) {
+    if (!sala.espinhos) return;
+
+    for (const e of sala.espinhos) {
+        // Posição atual e anterior da base (pé) do player usando o dt
+        const baseAtual = player.position.y + player.height;
+        const baseAntes = baseAtual - (player.velocity.y * dt);
+
+        const esquerda = player.position.x;
+        const direita = esquerda + player.width;
+
+        const blocoDireita = e.x + e.w;
+        const blocoBase = e.y + e.h;
+
+        // 1. Verifica se está dentro da largura horizontal do espinho
+        const dentroX = direita > e.x && esquerda < blocoDireita;
+
+        if (!dentroX) continue;
+
+        // 2. Verifica se o pé cruzou a linha de cima do espinho neste frame
+        const cruzouPorCima = baseAntes <= e.y && baseAtual >= e.y;
+
+        // Ou se o personagem está totalmente dentro da área do espinho
+        const dentroY = baseAtual > e.y && player.position.y < blocoBase;
+
+        if (cruzouPorCima || dentroY) {
+            sofrerDano(timestamp);
+            return;
+        }
+    }
+}
+
+// ==========================================
+// TELA FINAL DE AGRADECIMENTO
+// ==========================================
+
+function desenharTelaFinal() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!telaFinalImg.complete || telaFinalImg.naturalWidth === 0) return;
+
+    const fator = Math.min(
+        canvas.width / telaFinalImg.naturalWidth,
+        canvas.height / telaFinalImg.naturalHeight
+    );
+
+    const w = telaFinalImg.naturalWidth * fator;
+    const h = telaFinalImg.naturalHeight * fator;
+
+    ctx.drawImage(
+        telaFinalImg,
+        (canvas.width - w) / 2,
+        (canvas.height - h) / 2,
+        w,
+        h
+    );
+}
+
+function desenharMenuInicial() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!menuImg.complete || menuImg.naturalWidth === 0) return;
+
+    const fator = Math.min(
+        canvas.width / menuImg.naturalWidth,
+        canvas.height / menuImg.naturalHeight
+    );
+
+    const w = menuImg.naturalWidth * fator;
+    const h = menuImg.naturalHeight * fator;
+
+    ctx.drawImage(
+        menuImg,
+        (canvas.width - w) / 2,
+        (canvas.height - h) / 2,
+        w,
+        h
+    );
+}
+
+function desenharGameOver() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!gameOverImg.complete || gameOverImg.naturalWidth === 0) return;
+
+    const fator = Math.min(
+        canvas.width / gameOverImg.naturalWidth,
+        canvas.height / gameOverImg.naturalHeight
+    );
+
+    const w = gameOverImg.naturalWidth * fator;
+    const h = gameOverImg.naturalHeight * fator;
+
+    ctx.drawImage(
+        gameOverImg,
+        (canvas.width - w) / 2,
+        (canvas.height - h) / 2,
+        w,
+        h
+    );
+    // Indicador da opção selecionada.
+    ctx.font = "bold 24px monospace";
+    ctx.fillStyle = "white";
+    ctx.textAlign = "left";
+
+    const x = canvas.width / 2 - 235;
+    const y = opcaoGameOver === 0 ? 337 : 405;
+
+    ctx.fillText("▶", x, y);
+
+    ctx.textAlign = "left";
+}
+
+function iluminarTochas() {
+    if (sala !== salas.corredor) return;
+
+    ctx.save();
+
+    ctx.globalCompositeOperation = "lighter";
+
+    for (const tocha of tochas) {
+        const x = tocha.x - camera.x;
+        const y = tocha.y;
+        const raio = 170;
+
+        const luz = ctx.createRadialGradient(
+            x, y, 5,
+            x, y, raio
+        );
+
+        luz.addColorStop(0, "rgba(255, 190, 80, 0.9)");
+        luz.addColorStop(0.3, "rgba(255, 120, 30, 0.4)");
+        luz.addColorStop(0.7, "rgba(180, 50, 10, 0.12)");
+        luz.addColorStop(1, "rgba(255, 60, 0, 0)");
+        ctx.fillStyle = luz;
+
+        ctx.beginPath();
+        ctx.arc(x, y, raio, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+function aplicarEscuridaoCorredor() {
+    if (sala !== salas.corredor) return;
+
+    // Escurece a camada auxiliar inteira
+    ctxEscuridao.clearRect(
+        0, 0,
+        canvasEscuridao.width,
+        canvasEscuridao.height
+    );
+
+    ctxEscuridao.fillStyle = "rgba(0, 0, 0, 0.985)";
+    ctxEscuridao.fillRect(
+        0, 0,
+        canvasEscuridao.width,
+        canvasEscuridao.height
+    );
+
+    // Abre uma área de visão em cada tocha
+    ctxEscuridao.globalCompositeOperation = "destination-out";
+
+    for (const tocha of tochas) {
+        const xTela = tocha.x - camera.x;
+        const yTela = tocha.y;
+        const raio = 170;
+
+        const luz = ctxEscuridao.createRadialGradient(
+            xTela, yTela, 10,
+            xTela, yTela, raio
+        );
+
+        luz.addColorStop(0, "rgba(0, 0, 0, 1)");
+        luz.addColorStop(0.4, "rgba(0, 0, 0, 0.85)");
+        luz.addColorStop(0.75, "rgba(0, 0, 0, 0.4)");
+        luz.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+        ctxEscuridao.fillStyle = luz;
+        ctxEscuridao.beginPath();
+        ctxEscuridao.arc(xTela, yTela, raio, 0, Math.PI * 2);
+        ctxEscuridao.fill();
+    }
+
+    ctxEscuridao.globalCompositeOperation = "source-over";
+
+    // Aplica a escuridão sobre o jogo
+    ctx.drawImage(canvasEscuridao, 0, 0);
 }
 
 // ==========================================
@@ -520,12 +849,30 @@ function atualizarCamera() {
 function animate(timestamp) {
     requestAnimationFrame(animate);
 
-    // Delta time baseado em 60 FPS.
     const dt =
         Math.min(timestamp - lastTime, 50) /
         (1000 / 60);
 
     lastTime = timestamp;
+
+    // 1. Se estiver no Menu Inicial, desenha o menu e para por aqui
+    if (estado.menu) {
+        desenharMenuInicial();
+        return;
+    }
+
+    // 2. Se o jogador morreu, desenha o Game Over e para por aqui
+    if (estado.morreu) {
+        desenharGameOver();
+        return;
+    }
+
+    // 3. Se o jogo acabou (pegou o baú), desenha a tela final e para por aqui
+    if (estado.fim) {
+        desenharTelaFinal();
+        return;
+    }
+
 
     // Limpa o canvas.
     ctx.fillStyle = "black";
@@ -542,7 +889,7 @@ function animate(timestamp) {
 
     player.velocity.x = 0;
 
-    if (!player.isCrouching) {
+    if (!player.isCrouching && !player.isReloading) {
         if (keys.d.pressed) {
             player.velocity.x = 4;
         } else if (keys.a.pressed) {
@@ -555,8 +902,10 @@ function animate(timestamp) {
     // --------------------------------------
 
     if (keys.l.pressed) {
-        player.shoot(timestamp);
+        dispararTiro();
     }
+
+    atualizarTiros();
 
     // --------------------------------------
     // GUARDA A POSIÇÃO ANTERIOR
@@ -582,7 +931,6 @@ function animate(timestamp) {
     // MOVIMENTAÇÃO VERTICAL
     // --------------------------------------
 
-    // Reseta o estado antes de recalcular as colisões.
     onGround = false;
 
     player.position.y +=
@@ -594,7 +942,6 @@ function animate(timestamp) {
     
     resolverPlataformas(anterior);
 
-    // Encostou no chão ou numa plataforma: recupera os pulos.
     if (onGround) pulosUsados = 0;
 
     // --------------------------------------
@@ -606,13 +953,13 @@ function animate(timestamp) {
     }
 
     // --------------------------------------
-    // EVENTOS E TROCA DE SALAS
+    // EVENTOS E ESPINHOS
     // --------------------------------------
+
+    verificarEspinhos(timestamp, dt);
 
     verificarEventos();
 
-    // Garante que o jogador não fique fora dos limites
-    // depois de uma eventual troca de sala.
     limitarPosicao();
 
     // --------------------------------------
@@ -625,34 +972,144 @@ function animate(timestamp) {
     // RENDERIZAÇÃO
     // --------------------------------------
 
-    // 1. Fundo com paralaxe.
     desenharCeu();
 
-    // 2. Cenário principal.
     desenharCenario();
 
-    // 3. Jogador.
+    // Jogador (pisca enquanto está invulnerável).
     ctx.save();
 
     ctx.translate(-camera.x, 0);
 
-    player.draw(
-        ctx,
-        timestamp,
-        onGround
-    );
+    if (timestamp < invulneravelAte) {
+        ctx.globalAlpha = Math.floor(timestamp / 100) % 2 ? 0.35 : 1;
+    }
+
+    player.draw(ctx, timestamp, onGround);
 
     ctx.restore();
-}
 
+    desenharTiros();    
+
+    // Efeito de luz das tochas e escuridão no corredor
+    iluminarTochas();
+    aplicarEscuridaoCorredor();
+
+    // Vida (quadradinhos provisórios).
+    for (let i = 0; i < vidaMax; i++) {
+        ctx.fillStyle = i < vida ? "#d22" : "#333";
+        ctx.fillRect(20 + i * 28, 20, 20, 20);
+    }
+    // HUD de munição
+    for (let i = 0; i < player.maxAmmo; i++) {
+        ctx.fillStyle = i < player.ammo ? "#ffcc00" : "#333";
+        ctx.fillRect(20 + i * 28, 50, 20, 20);
+    }
+}
 // Inicia o jogo.
 requestAnimationFrame(animate);
+
+function iniciarJogo() {
+    estado.menu = false;
+    estado.morreu = false;
+    estado.fim = false;
+
+    vida = vidaMax;
+    invulneravelAte = 0;
+
+    estado.bossMorto = false;
+    estado.puloDuplo = false;
+
+    pulosUsados = 0;
+    onGround = false;
+
+    carregarSala(salas.tutorial);
+
+    player.position.x = 0;
+    player.position.y = 430;
+
+    player.velocity.x = 0;
+    player.velocity.y = 0;
+
+    camera.x = 0;
+
+    console.log("Jogo iniciado!");
+}
+
+function voltarAoMenu() {
+    estado.menu = true;
+    estado.morreu = false;
+    estado.fim = false;
+
+    vida = vidaMax;
+    invulneravelAte = 0;
+
+    estado.bossMorto = false;
+    estado.puloDuplo = false;
+
+    pulosUsados = 0;
+    onGround = false;
+
+    carregarSala(salas.tutorial);
+
+    player.position.x = 0;
+    player.position.y = 430;
+
+    player.velocity.x = 0;
+    player.velocity.y = 0;
+
+    camera.x = 0;
+
+    opcaoGameOver = 0;
+
+    console.log("Voltando ao menu principal.");
+}
 
 // ==========================================
 // EVENTOS DO TECLADO
 // ==========================================
 
 window.addEventListener("keydown", (event) => {
+    // Menu inicial: Enter ou espaço para iniciar.
+    if (estado.menu) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            iniciarJogo();
+        }
+        return;
+    }
+
+    // Game Over: Enter ou espaço para reiniciar.
+    if (estado.morreu) {
+        // Alterna entre Reiniciar e Menu Principal.
+        if (
+            event.key === "ArrowUp" ||
+            event.key === "ArrowDown" ||
+            event.key === "w" ||
+            event.key === "s"
+        ) {
+            event.preventDefault();
+            opcaoGameOver = 1 - opcaoGameOver;
+            return;
+        }
+
+        // Confirma a opção selecionada.
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+
+            if (opcaoGameOver === 0) {
+                iniciarJogo();
+            } else {
+                voltarAoMenu();
+            }
+        }
+
+        return;
+    }
+
+    // Ignora os controles durante a tela final.
+    if (estado.fim) return;
+
     switch (event.key) {
         case "d":
         case "D":
@@ -682,11 +1139,10 @@ window.addEventListener("keydown", (event) => {
 
         case "e":
         case "E":
-            // event.repeat evita que segurar a tecla dispare várias vezes.
             if (!event.repeat) keys.e.pressed = true;
             break;
 
-        // TESTE TEMPORÁRIO: simula o boss morrendo. Apaga depois.
+        // TESTE TEMPORÁRIO: simula o boss morrendo.
         case "m":
         case "M":
             estado.bossMorto = true;
@@ -719,7 +1175,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 // ==========================================
-// SOLTAR TECLAS
+// SOLTAR TECLAS (CORREÇÃO DE MOVIMENTO)
 // ==========================================
 
 window.addEventListener("keyup", (event) => {
@@ -755,8 +1211,6 @@ window.addEventListener("keyup", (event) => {
     }
 });
 
-// Evita que o personagem continue andando ou atirando
-// caso a janela perca o foco enquanto uma tecla está pressionada.
 window.addEventListener("blur", () => {
     keys.d.pressed = false;
     keys.a.pressed = false;

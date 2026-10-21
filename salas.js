@@ -29,10 +29,14 @@ export const salas = {
             //portão no final
             { x: 4993, y: 47, w: 62, h: 254 },
         ],
+                espinhos: [
+            { x: 835, y: 515, w: 446, h: 34 },   // fundo do buraco (estimado)
+        ],
+        respawn: { x: 500, y: 500 },             // y = linha do chão onde ele reaparece
         eventList: [
             {
                 id: 'irParaCorredor',
-                x: 5070,
+                x: 5070, y: 500, w: 50, h: 50,
                 acao: 'trocarSala',
                 destino: 'corredor',
                 spawn: { x: 0, },
@@ -171,6 +175,12 @@ export const salas = {
             //embaixo do bau
             { x: 763, y: 483, w: 378, h: 36 },
         ],
-        eventList: [],
+        eventList: [
+            {
+                id: 'bau',
+                x: 934, y: 420, w: 110, h: 50, // Em cima da plataforma do baú
+                acao: 'telaFinal',
+            },
+        ],
     },
 };
