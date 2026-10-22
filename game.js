@@ -1,5 +1,6 @@
 import { Player } from "./player.js";
 import { salas } from "./salas.js";
+import { Boss } from "./boss.js";
 
 // ==========================================
 // CONFIGURAÇÃO DO CANVAS
@@ -23,6 +24,12 @@ const player = new Player({
     position: { x: 0, y: 430 },
     imageSrc: "./img/spritesheet.png"
 });
+
+const boss = new Boss({
+    position: { x: 1100, y: 0 },       // o y certo é colocado no resetarBoss
+    imageSrc: "./img/boss.png"
+});
+const projeteisBoss = [];       
 
 // ==========================================
 // SALA E RECURSOS
@@ -237,6 +244,9 @@ function carregarSala(nova) {
 
     // Reinicia a lista de eventos da nova sala.
     eventosAtivados.clear();
+
+        // Ao entrar na sala do boss (e ele ainda vivo), reinicia a luta
+    if (nova === salas.boss && !estado.bossMorto) resetarBoss();
 
     console.log("Sala carregada:", sala.cenario);
 }
@@ -597,6 +607,8 @@ function limitarPosicao() {
     );
 }
 
+    
+
 // ==========================================
 // CÂMERA
 // ==========================================
@@ -843,6 +855,267 @@ function aplicarEscuridaoCorredor() {
 }
 
 // ==========================================
+// BOSS: CAVALEIRO SOMBRIO
+// ==========================================
+
+function retangulosSeTocam(a, b) {
+    return (
+        a.x < b.x + b.w && a.x + a.w > b.x &&
+        a.y < b.y + b.h && a.y + a.h > b.y
+    );
+}
+
+function retanguloPlayer() {
+    return { x: player.position.x, y: player.position.y, w: player.width, h: player.height };
+}
+
+function retanguloBoss() {
+    return { x: boss.position.x, y: boss.position.y, w: boss.width, h: boss.height };
+}
+
+// Coloca o boss vivo e cheio de vida no início da luta
+function resetarBoss() {
+    boss.vida = boss.vidaMax;
+    boss.estado = "idle";
+    boss.setAnimacao("idle");
+    boss.position.x = 1100;
+    boss.position.y = salas.boss.floorY - boss.alturaNoChao;
+    boss.proximoAtaque = performance.now() + 1500;   // respira antes do 1º ataque
+    boss.piscaAte = 0;
+    projeteisBoss.length = 0;
+}
+
+// Dano no jogador vindo do boss (sem teleportar para o respawn, só um pulinho)
+function sofrerDanoBoss(timestamp) {
+    if (timestamp < invulneravelAte) return;
+
+    vida--;
+    invulneravelAte = timestamp + 1500;
+
+    if (vida <= 0) {
+        estado.morreu = true;
+        return;
+    }
+
+    player.velocity.y = -6;
+    onGround = false;
+}
+
+// Os tiros do jogador acertam o boss
+function receberTirosNoBoss(timestamp) {
+    const alvo = retanguloBoss();
+
+    for (let i = tiros.length - 1; i >= 0; i--) {
+        const t = tiros[i];
+        const tiroRect = { x: t.x, y: t.y, w: t.tamanho, h: 4 };
+
+        if (retangulosSeTocam(tiroRect, alvo)) {
+            tiros.splice(i, 1);
+            boss.vida--;
+            boss.piscaAte = timestamp + 120;
+        }
+    }
+}
+
+// Zona na frente do boss onde o golpe machuca
+function zonaDoGolpe(alcance) {
+    return {
+        x: boss.facingRight ? boss.position.x + boss.width : boss.position.x - alcance,
+        y: boss.position.y + boss.height * 0.15,
+        w: alcance,
+        h: boss.height * 0.85
+    };
+}
+
+function dispararProjetilBoss() {
+    const raio = 12;
+
+    projeteisBoss.push({
+        x: boss.facingRight ? boss.position.x + boss.width + raio : boss.position.x - raio,
+        y: boss.position.y + boss.height * 0.4,      // centro da bola
+        vx: (boss.facingRight ? 1 : -1) * 5.5,
+        raio: raio
+    });
+}
+
+function atualizarProjeteisBoss(timestamp, dt) {
+    for (let i = projeteisBoss.length - 1; i >= 0; i--) {
+        const p = projeteisBoss[i];
+        p.x += p.vx * dt;
+
+        // Saiu do mundo
+        if (p.x < 0 || p.x > larguraMundo) {
+            projeteisBoss.splice(i, 1);
+            continue;
+        }
+
+        const rect = { x: p.x - p.raio, y: p.y - p.raio, w: p.raio * 2, h: p.raio * 2 };
+
+        // Bateu numa parede
+        let bateu = false;
+        if (sala.solidos) {
+            for (const b of sala.solidos) {
+                if (retangulosSeTocam(rect, b)) { bateu = true; break; }
+            }
+        }
+
+        // Acertou o jogador
+        if (!bateu && retangulosSeTocam(rect, retanguloPlayer())) {
+            sofrerDanoBoss(timestamp);
+            bateu = true;
+        }
+
+        if (bateu) projeteisBoss.splice(i, 1);
+    }
+}
+
+function desenharProjeteisBoss() {
+    for (const p of projeteisBoss) {
+        const x = p.x - camera.x;
+        const brilho = ctx.createRadialGradient(x, p.y, 2, x, p.y, p.raio * 1.6);
+        brilho.addColorStop(0, "rgba(255, 255, 255, 1)");
+        brilho.addColorStop(0.3, "rgba(190, 100, 255, 0.95)");
+        brilho.addColorStop(1, "rgba(120, 30, 200, 0)");
+
+        ctx.fillStyle = brilho;
+        ctx.beginPath();
+        ctx.arc(x, p.y, p.raio * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function iniciarAtaqueBoss(nome) {
+    boss.estado = nome;
+    boss.setAnimacao(nome);
+    boss.velocity.x = 0;
+    boss.disparou = false;
+}
+
+function atualizarBoss(timestamp, dt) {
+    if (sala !== salas.boss) return;
+
+    // --- MORTO: só fica o pó no chão ---
+    if (boss.estado === "morto") return;
+
+    // --- MORRENDO: espera a animação acabar e libera a saída ---
+    if (boss.estado === "morte") {
+        if (boss.terminou) {
+            boss.estado = "morto";
+            boss.setAnimacao("fim");
+            estado.bossMorto = true;   // libera a porta de saída
+            estado.puloDuplo = true;   // libera o pulo duplo
+        }
+        return;
+    }
+
+    // --- TIROS DO JOGADOR ---
+    receberTirosNoBoss(timestamp);
+
+    if (boss.vida <= 0) {
+        boss.estado = "morte";
+        boss.setAnimacao("morte");
+        boss.velocity.x = 0;
+        projeteisBoss.length = 0;
+        return;
+    }
+
+    // Fase 2: com metade da vida ou menos, fica mais rápido e agressivo
+    const mult = boss.vida <= boss.vidaMax / 2 ? 1.5 : 1;
+
+    const centroBoss = boss.position.x + boss.width / 2;
+    const centroPlayer = player.position.x + player.width / 2;
+    const distancia = centroPlayer - centroBoss;       // positivo = jogador à direita
+    const dist = Math.abs(distancia);
+
+    // --- ATACANDO ---
+    if (boss.estado.startsWith("ataque")) {
+        boss.velocity.x = 0;
+
+        // Golpes corpo a corpo: machucam só nos frames ativos
+        const golpe = boss.golpes[boss.estado];
+        if (golpe && boss.frame >= golpe.ini && boss.frame <= golpe.fim) {
+            if (retangulosSeTocam(zonaDoGolpe(golpe.alcance), retanguloPlayer())) {
+                sofrerDanoBoss(timestamp);
+            }
+        }
+
+        // Projétil: sai uma vez, no frame certo
+        if (boss.estado === "ataque3" && boss.frame >= boss.frameTiro && !boss.disparou) {
+            boss.disparou = true;
+            dispararProjetilBoss();
+        }
+
+        // Fim da animação: volta ao idle e começa o cooldown
+        if (boss.terminou) {
+            boss.estado = "idle";
+            boss.setAnimacao("idle");
+            boss.proximoAtaque = timestamp + boss.cooldownAtaque / mult;
+        }
+    }
+    // --- IDLE / ANDAR ---
+    else {
+        boss.facingRight = distancia > 0;      // sempre olha para o jogador
+
+        const perto = dist <= boss.alcanceAtaque;
+        let ataque = null;
+
+        if (timestamp >= boss.proximoAtaque) {
+            if (perto) {
+                ataque = Math.random() < 0.5 ? "ataque1" : "ataque2";
+            } else if (dist > boss.distanciaProjetil) {
+                ataque = "ataque3";
+            }
+        }
+
+        if (ataque) {
+            iniciarAtaqueBoss(ataque);
+        } else if (!perto) {
+            boss.estado = "andar";
+            boss.setAnimacao("andar");
+            boss.velocity.x = (distancia > 0 ? 1 : -1) * boss.velocidade * mult;
+        } else {
+            boss.estado = "idle";
+            boss.setAnimacao("idle");
+            boss.velocity.x = 0;
+        }
+    }
+
+    // Movimento horizontal (com dt) e limites da sala
+    boss.position.x += boss.velocity.x * dt;
+    boss.position.x = Math.max(0, Math.min(boss.position.x, 1486 - boss.width));
+
+    // Encostar no boss também machuca
+    if (retangulosSeTocam(retanguloBoss(), retanguloPlayer())) {
+        sofrerDanoBoss(timestamp);
+    }
+}
+
+// Barra de vida do boss (embaixo da tela)
+function desenharVidaBoss() {
+    if (sala !== salas.boss) return;
+    if (boss.estado === "morte" || boss.estado === "morto") return;
+
+    const largura = 400;
+    const x = (canvas.width - largura) / 2;
+    const y = canvas.height - 40;
+
+    ctx.fillStyle = "#333";
+    ctx.fillRect(x, y, largura, 14);
+
+    ctx.fillStyle = "#a33cff";
+    ctx.fillRect(x, y, largura * Math.max(0, boss.vida) / boss.vidaMax, 14);
+
+    ctx.strokeStyle = "white";
+    ctx.strokeRect(x, y, largura, 14);
+
+    ctx.font = "bold 14px monospace";
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.fillText("CAVALEIRO SOMBRIO", canvas.width / 2, y - 6);
+    ctx.textAlign = "left";
+}
+
+// ==========================================
 // LOOP PRINCIPAL
 // ==========================================
 
@@ -962,6 +1235,10 @@ function animate(timestamp) {
 
     limitarPosicao();
 
+    // Boss e projéteis dele
+    atualizarBoss(timestamp, dt);
+    atualizarProjeteisBoss(timestamp, dt);
+
     // --------------------------------------
     // ATUALIZA CÂMERA
     // --------------------------------------
@@ -977,9 +1254,16 @@ function animate(timestamp) {
     desenharCenario();
 
     // Jogador (pisca enquanto está invulnerável).
-    ctx.save();
+        ctx.save();
 
     ctx.translate(-camera.x, 0);
+
+    // Boss (desenhado antes, para o jogador ficar na frente). Pisca ao levar tiro.
+    if (sala === salas.boss) {
+        ctx.globalAlpha = timestamp < boss.piscaAte ? 0.5 : 1;
+        boss.draw(ctx, timestamp);
+        ctx.globalAlpha = 1;
+    }
 
     if (timestamp < invulneravelAte) {
         ctx.globalAlpha = Math.floor(timestamp / 100) % 2 ? 0.35 : 1;
@@ -989,7 +1273,8 @@ function animate(timestamp) {
 
     ctx.restore();
 
-    desenharTiros();    
+    desenharTiros();
+    desenharProjeteisBoss();   
 
     // Efeito de luz das tochas e escuridão no corredor
     iluminarTochas();
@@ -1005,6 +1290,7 @@ function animate(timestamp) {
         ctx.fillStyle = i < player.ammo ? "#ffcc00" : "#333";
         ctx.fillRect(20 + i * 28, 50, 20, 20);
     }
+        desenharVidaBoss();
 }
 // Inicia o jogo.
 requestAnimationFrame(animate);
@@ -1024,6 +1310,8 @@ function iniciarJogo() {
     onGround = false;
 
     carregarSala(salas.tutorial);
+
+    resetarBoss();
 
     player.position.x = 0;
     player.position.y = 430;
@@ -1051,6 +1339,8 @@ function voltarAoMenu() {
     onGround = false;
 
     carregarSala(salas.tutorial);
+
+        resetarBoss();
 
     player.position.x = 0;
     player.position.y = 430;
