@@ -101,7 +101,7 @@ function dispararTiro() {
             ? player.position.x + player.width
             : player.position.x - tamanho,
 
-        y: player.position.y + player.height * 0.45,
+        y: player.position.y + player.height * 0.15,
 
         vx: player.facingRight ? velocidade : -velocidade,
         tamanho: tamanho
