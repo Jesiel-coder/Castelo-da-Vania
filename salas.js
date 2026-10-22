@@ -33,6 +33,13 @@ export const salas = {
             { x: 835, y: 515, w: 446, h: 34 },   // fundo do buraco (estimado)
         ],
         respawn: { x: 500, y: 500 },             // y = linha do chão onde ele reaparece
+
+        // INIMIGOS DESTA SALA
+    inimigos: [
+        { tipo: 'zumbi', x: 700, y: 500 },
+        { tipo: 'zumbi', x: 2000, y: 500 },
+    ],
+
         eventList: [
             {
                 id: 'irParaCorredor',

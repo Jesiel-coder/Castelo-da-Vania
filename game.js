@@ -1,6 +1,7 @@
 import { Player } from "./player.js";
 import { salas } from "./salas.js";
 import { Boss } from "./boss.js";
+import { criarInimigo, desenharOnda } from "./inimigos.js";
 
 // ==========================================
 // CONFIGURAÇÃO DO CANVAS
@@ -30,6 +31,9 @@ const boss = new Boss({
     imageSrc: "./img/boss.png"
 });
 const projeteisBoss = [];       
+const minions = [];   // capangas invocados pelo boss
+const inimigos = [];
+const ondasSonicas = [];
 
 // ==========================================
 // SALA E RECURSOS
@@ -244,6 +248,7 @@ function carregarSala(nova) {
 
     // Reinicia a lista de eventos da nova sala.
     eventosAtivados.clear();
+        spawnarInimigos(nova);
 
         // Ao entrar na sala do boss (e ele ainda vivo), reinicia a luta
     if (nova === salas.boss && !estado.bossMorto) resetarBoss();
@@ -883,6 +888,7 @@ function resetarBoss() {
     boss.proximoAtaque = performance.now() + 1500;   // respira antes do 1º ataque
     boss.piscaAte = 0;
     projeteisBoss.length = 0;
+    inimigos.length = 0; ondasSonicas.length = 0;
 }
 
 // Dano no jogador vindo do boss (sem teleportar para o respawn, só um pulinho)
@@ -1016,6 +1022,7 @@ function atualizarBoss(timestamp, dt) {
         boss.setAnimacao("morte");
         boss.velocity.x = 0;
         projeteisBoss.length = 0;
+        minions.length = 0;
         return;
     }
 
@@ -1045,6 +1052,12 @@ function atualizarBoss(timestamp, dt) {
             dispararProjetilBoss();
         }
 
+            // Invocação: os capangas surgem uma vez, no frame certo
+        if (boss.estado === "ataque4" && boss.frame >= boss.frameInvocar && !boss.disparou) {
+            boss.disparou = true;
+            invocarMinions(timestamp);
+        }
+
         // Fim da animação: volta ao idle e começa o cooldown
         if (boss.terminou) {
             boss.estado = "idle";
@@ -1052,44 +1065,49 @@ function atualizarBoss(timestamp, dt) {
             boss.proximoAtaque = timestamp + boss.cooldownAtaque / mult;
         }
     }
-    // --- IDLE / ANDAR ---
-    else {
-        boss.facingRight = distancia > 0;      // sempre olha para o jogador
+   // --- IDLE / ANDAR ---
+else {
+    boss.facingRight = distancia > 0; // sempre olha para o jogador
 
-        const perto = dist <= boss.alcanceAtaque;
-        let ataque = null;
+    const perto = dist <= boss.alcanceAtaque;
+    let ataque = null;
 
-        if (timestamp >= boss.proximoAtaque) {
-            if (perto) {
-                ataque = Math.random() < 0.5 ? "ataque1" : "ataque2";
-            } else if (dist > boss.distanciaProjetil) {
-                ataque = "ataque3";
-            }
-        }
-
-        if (ataque) {
-            iniciarAtaqueBoss(ataque);
-        } else if (!perto) {
-            boss.estado = "andar";
-            boss.setAnimacao("andar");
-            boss.velocity.x = (distancia > 0 ? 1 : -1) * boss.velocidade * mult;
-        } else {
-            boss.estado = "idle";
-            boss.setAnimacao("idle");
-            boss.velocity.x = 0;
+    if (timestamp >= boss.proximoAtaque) {
+        // Sem capangas vivos, tem chance de invocar (maior na fase 2)
+        if (
+            !inimigos.some(inimigo => inimigo.vida > 0) &&
+            Math.random() < 0.35 * mult
+        ) {
+            ataque = "ataque4";
+        } else if (perto) {
+            ataque = Math.random() < 0.5 ? "ataque1" : "ataque2";
+        } else if (dist > boss.distanciaProjetil) {
+            ataque = "ataque3";
         }
     }
 
-    // Movimento horizontal (com dt) e limites da sala
-    boss.position.x += boss.velocity.x * dt;
-    boss.position.x = Math.max(0, Math.min(boss.position.x, 1486 - boss.width));
-
-    // Encostar no boss também machuca
-    if (retangulosSeTocam(retanguloBoss(), retanguloPlayer())) {
-        sofrerDanoBoss(timestamp);
+    if (ataque) {
+        iniciarAtaqueBoss(ataque);
+    } else if (!perto) {
+        boss.estado = "andar";
+        boss.setAnimacao("andar");
+        boss.velocity.x = (distancia > 0 ? 1 : -1) * boss.velocidade * mult;
+    } else {
+        boss.estado = "idle";
+        boss.setAnimacao("idle");
+        boss.velocity.x = 0;
     }
 }
 
+// Movimento horizontal (com dt) e limites da sala
+boss.position.x += boss.velocity.x * dt;
+boss.position.x = Math.max(0, Math.min(boss.position.x, 1486 - boss.width));
+
+// Encostar no boss também machuca
+if (retangulosSeTocam(retanguloBoss(), retanguloPlayer())) {
+    sofrerDanoBoss(timestamp);
+}
+}
 // Barra de vida do boss (embaixo da tela)
 function desenharVidaBoss() {
     if (sala !== salas.boss) return;
@@ -1113,6 +1131,395 @@ function desenharVidaBoss() {
     ctx.textAlign = "center";
     ctx.fillText("CAVALEIRO SOMBRIO", canvas.width / 2, y - 6);
     ctx.textAlign = "left";
+}
+
+// ==========================================
+// INIMIGOS: ZUMBI E GÁRGULA
+// ==========================================
+
+function retanguloDe(e) {
+    return { x: e.position.x, y: e.position.y, w: e.width, h: e.height };
+}
+
+// Zona na frente do inimigo (arranhão)
+function zonaFrente(e, alcance) {
+    return {
+        x: e.facingRight ? e.position.x + e.width : e.position.x - alcance,
+        y: e.position.y + e.height * 0.2,
+        w: alcance,
+        h: e.height * 0.8
+    };
+}
+
+function inimigosVivos() {
+    return inimigos.filter(i => i.estado !== "morto" && i.estado !== "morrendo").length;
+}
+
+function spawnarInimigos(s) {
+    inimigos.length = 0;
+    ondasSonicas.length = 0;
+
+    console.log("=== SPAWN DE INIMIGOS ===");
+    console.log("Cenário:", s.cenario);
+    console.log("Inimigos configurados:", s.inimigos);
+
+    if (!s.inimigos || s.inimigos.length === 0) {
+        console.warn("Nenhum inimigo configurado nesta sala.");
+        return;
+    }
+
+    for (const e of s.inimigos) {
+        const chao = e.y ?? e.chao ?? s.floorY;
+
+        const inimigo = criarInimigo(e.tipo, e.x, chao, {
+            minX: e.minX ?? 40,
+            maxX: e.maxX ?? (s.largura * s.escala - 40)
+        });
+
+        inimigos.push(inimigo);
+
+        console.log("Inimigo criado:", {
+            tipo: inimigo.tipo,
+            x: inimigo.position.x,
+            y: inimigo.position.y,
+            largura: inimigo.width,
+            altura: inimigo.height,
+            estado: inimigo.estado,
+            imagem: inimigo.image.src,
+            imagemCarregada: inimigo.image.complete,
+            dimensoesImagem: `${inimigo.image.naturalWidth}x${inimigo.image.naturalHeight}`
+        });
+
+        inimigo.image.onload = () => {
+            console.log(
+                `Imagem de ${inimigo.tipo} carregada:`,
+                inimigo.image.naturalWidth,
+                "x",
+                inimigo.image.naturalHeight
+            );
+        };
+
+        inimigo.image.onerror = () => {
+            console.error("ERRO AO CARREGAR IMAGEM:", inimigo.image.src);
+        };
+    }
+    console.log("FINAL DO SPAWN:", inimigos.length);
+    console.log("Total de inimigos criados:", inimigos.length);
+}
+
+// Invocação do boss: um inimigo por vez
+// 75% de chance de zumbi e 25% de chance de gárgula
+function invocarMinions(timestamp) {
+    // Não invoca outro enquanto houver um inimigo vivo
+    if (inimigos.some(inimigo => inimigo.vida > 0)) {
+        return;
+    }
+
+    const chao = salas.boss.floorY;
+
+    // Alterna aleatoriamente o lado da invocação
+    const esquerda = Math.random() < 0.5;
+    const x = esquerda
+        ? Math.max(60, boss.position.x - 110)
+        : Math.min(1420, boss.position.x + boss.width + 70);
+
+    // Sorteia o tipo do inimigo
+    const tipo = Math.random() < 0.25 ? "gargula" : "zumbi";
+
+    const opcoes = {
+        acordado: true,
+        minX: 50,
+        maxX: 1480
+    };
+
+    inimigos.push(criarInimigo(tipo, x, chao, opcoes));
+}
+
+// Os tiros do jogador acertam o inimigo
+function receberTirosNoInimigo(ini, timestamp) {
+    const alvo = retanguloDe(ini);
+
+    for (let i = tiros.length - 1; i >= 0; i--) {
+        const t = tiros[i];
+
+        if (!retangulosSeTocam({ x: t.x, y: t.y, w: t.tamanho, h: 4 }, alvo)) continue;
+
+        tiros.splice(i, 1);                       // o tiro some sempre
+
+        if (ini.estado === "agachado") continue;  // zumbi agachado é imortal
+
+        ini.vida--;
+        ini.piscaAte = timestamp + 120;
+
+        if (ini.estado === "idle") ini.estado = "perseguir";   // acordou a gárgula
+
+        // Zumbi cambaleia ao levar tiro
+        if (ini.cfg.cambaleia && ini.estado === "perseguir") {
+            ini.estado = "dano";
+            ini.setAnimacao("dano");
+        }
+    }
+}
+
+// ---------- IA DO ZUMBI ----------
+function iaZumbi(z, timestamp, dx, dist, dy) {
+    const jogador = retanguloPlayer();
+
+    // Distância horizontal entre as bordas dos personagens.
+    const zEsquerda = z.position.x;
+    const zDireita = z.position.x + z.width;
+    const pEsquerda = jogador.x;
+    const pDireita = jogador.x + jogador.w;
+
+    let distanciaBordas;
+
+    if (zDireita < pEsquerda) {
+        distanciaBordas = pEsquerda - zDireita;
+    } else if (pDireita < zEsquerda) {
+        distanciaBordas = zEsquerda - pDireita;
+    } else {
+        distanciaBordas = 0;
+    }
+
+    const dir = dx > 0 ? 1 : -1;
+
+    // Se o jogador se afastar mais de 60 px,
+    // o zumbi interrompe o que estiver fazendo e se agacha.
+    if (distanciaBordas > 200) {
+        z.estado = "agachado";
+        z.vx = 0;
+        z.setAnimacao("agachar");
+        return;
+    }
+
+    switch (z.estado) {
+        case "agachado":
+            z.vx = 0;
+            z.setAnimacao("agachar");
+
+            // Desperta quando o jogador chega a 50 px das bordas.
+            if (distanciaBordas <= 200 && dy < 200) {
+            z.estado = "levantando";
+            z.setAnimacao("levantar");
+            }
+            break;
+
+        case "levantando":
+            z.vx = 0;
+
+            if (z.terminou) {
+                z.estado = "perseguir";
+            }
+            break;
+
+        case "dano":
+            z.vx = 0;
+
+            if (z.terminou) {
+                z.estado = "perseguir";
+            }
+            break;
+
+        case "atacando": {
+            z.vx = 0;
+
+            const golpe = z.cfg.golpe;
+
+            if (
+                z.frame >= golpe.ini &&
+                z.frame <= golpe.fim &&
+                retangulosSeTocam(
+                    zonaFrente(z, golpe.alcance),
+                    retanguloPlayer()
+                )
+            ) {
+                sofrerDanoBoss(timestamp);
+            }
+
+            if (z.terminou) {
+                z.estado = "perseguir";
+                z.proximoAtaque = timestamp + 1200;
+            }
+            break;
+        }
+
+        default:
+            z.facingRight = dx > 0;
+
+            if (
+            distanciaBordas <= 35 &&
+            timestamp >= z.proximoAtaque
+            ) {
+                z.estado = "atacando";
+                z.vx = 0;
+                z.setAnimacao("ataque");
+            } else {
+                z.setAnimacao("andar");
+                z.vx = dir * z.cfg.velocidade;
+            }
+            break;
+    }
+}
+
+// ---------- IA DA GÁRGULA ----------
+function dispararOnda(g) {
+    ondasSonicas.push({
+        x: g.facingRight ? g.position.x + g.width + 20 : g.position.x - 20,
+        y: g.position.y + g.height * 0.4,
+        vx: (g.facingRight ? 1 : -1) * 4.5
+    });
+}
+
+function iaGargula(g, timestamp, dx, dist) {
+    const dir = dx > 0 ? 1 : -1;
+
+    // Quanto mais ferida, mais rápida fica.
+    const vidaRestante = Math.max(0, g.vida / g.vidaMax);
+    const perdida = 1 - vidaRestante;
+    const furia = 1 + perdida;
+
+    // A velocidade de animação acompanha a fúria.
+    g.velAnim = furia;
+
+    switch (g.estado) {
+        case "idle":
+            g.setAnimacao("idle");
+
+            if (dist < g.cfg.visao) {
+                g.estado = "perseguir";
+            }
+            break;
+
+        case "gritando":
+            // Dispara a onda sonora durante a animação.
+            if (g.frame >= g.cfg.frameGrito && !g.disparou) {
+                g.disparou = true;
+                dispararOnda(g);
+            }
+
+            if (g.terminou) {
+                g.estado = "perseguir";
+                g.proximoAtaque = timestamp + 2500 / furia;
+            }
+            break;
+
+        default:
+            g.facingRight = dx > 0;
+
+            // O ataque sonoro só fica disponível com 45% da vida ou menos.
+            if (vidaRestante <= 0.45 && dist > 120) {
+                // A chance aumenta conforme a velocidade de ataque aumenta.
+                const chanceBase = 0.005;
+                const chance = chanceBase * furia;
+
+                if (
+                    timestamp >= g.proximoAtaque &&
+                    Math.random() < chance
+                ) {
+                    g.estado = "gritando";
+                    g.setAnimacao("ataque");
+                    g.disparou = false;
+                    break;
+                }
+            }
+
+            // Movimento normal: mais velocidade quando perde vida.
+            g.setAnimacao(perdida >= 0.4 ? "correr" : "andar");
+            g.vx = dir * g.cfg.velocidade * furia;
+
+            if (
+                retangulosSeTocam(
+                    {
+                        x: g.position.x,
+                        y: g.position.y,
+                        w: g.width,
+                        h: g.height
+                    },
+                    retanguloPlayer()
+                )
+            ) {
+                sofrerDanoBoss(timestamp);
+            }
+            break;
+    }
+}
+
+function atualizarInimigo(ini, timestamp, dt) {
+    if (ini.estado === "morto") return;
+
+    // Morrendo: espera a animação acabar
+    if (ini.estado === "morrendo") {
+        if (ini.terminou) ini.estado = "morto";
+        return;
+    }
+
+    receberTirosNoInimigo(ini, timestamp);
+
+    if (ini.vida <= 0) {
+        ini.estado = "morrendo";
+        ini.setAnimacao("morte");
+        return;
+    }
+
+    const dx = (player.position.x + player.width / 2) - (ini.position.x + ini.width / 2);
+    const dist = Math.abs(dx);
+    const dy = Math.abs(player.position.y - ini.position.y);
+
+    ini.vx = 0;
+
+    if (ini.tipo === "zumbi") iaZumbi(ini, timestamp, dx, dist, dy);
+    else iaGargula(ini, timestamp, dx, dist);
+
+    // Movimento horizontal (com dt) e limites
+    ini.position.x += ini.vx * dt;
+    ini.position.x = Math.max(ini.minX, Math.min(ini.position.x, ini.maxX - ini.width));
+}
+
+function atualizarInimigos(timestamp, dt) {
+    for (const ini of inimigos) atualizarInimigo(ini, timestamp, dt);
+}
+
+function atualizarOndas(timestamp, dt) {
+    for (let i = ondasSonicas.length - 1; i >= 0; i--) {
+        const o = ondasSonicas[i];
+        o.x += o.vx * dt;
+
+        if (o.x < 0 || o.x > larguraMundo) {
+            ondasSonicas.splice(i, 1);
+            continue;
+        }
+
+        const rect = { x: o.x - 22, y: o.y - 40, w: 44, h: 80 };
+
+        let bateu = false;
+        if (sala.solidos) {
+            for (const b of sala.solidos) {
+                if (retangulosSeTocam(rect, b)) { bateu = true; break; }
+            }
+        }
+
+        if (!bateu && retangulosSeTocam(rect, retanguloPlayer())) {
+            sofrerDanoBoss(timestamp);
+            bateu = true;
+        }
+
+        if (bateu) ondasSonicas.splice(i, 1);
+    }
+}
+
+// Chamar dentro do ctx.translate(-camera.x, 0)
+function desenharInimigos(timestamp) {
+    console.log("Desenhando inimigos:", inimigos.length);
+
+    for (const ini of inimigos) {
+        ini.draw(ctx, timestamp);
+    }
+
+    for (const o of ondasSonicas) {
+        desenharOnda(ctx, o, timestamp);
+    }
+
+    console.log("DESENHO:", inimigos.length);
 }
 
 // ==========================================
@@ -1238,6 +1645,8 @@ function animate(timestamp) {
     // Boss e projéteis dele
     atualizarBoss(timestamp, dt);
     atualizarProjeteisBoss(timestamp, dt);
+    atualizarInimigos(timestamp, dt);
+    atualizarOndas(timestamp, dt);
 
     // --------------------------------------
     // ATUALIZA CÂMERA
@@ -1260,7 +1669,6 @@ function animate(timestamp) {
 
     // Boss (desenhado antes, para o jogador ficar na frente). Pisca ao levar tiro.
     if (sala === salas.boss) {
-        ctx.globalAlpha = timestamp < boss.piscaAte ? 0.5 : 1;
         boss.draw(ctx, timestamp);
         ctx.globalAlpha = 1;
     }
@@ -1268,6 +1676,7 @@ function animate(timestamp) {
     if (timestamp < invulneravelAte) {
         ctx.globalAlpha = Math.floor(timestamp / 100) % 2 ? 0.35 : 1;
     }
+    desenharInimigos(timestamp);
 
     player.draw(ctx, timestamp, onGround);
 
@@ -1309,9 +1718,12 @@ function iniciarJogo() {
     pulosUsados = 0;
     onGround = false;
 
-    carregarSala(salas.tutorial);
-
+    // Primeiro, reinicia o boss.
+    // resetarBoss() limpa o array de inimigos.
     resetarBoss();
+
+    // Depois, carrega a sala e cria os inimigos dela.
+    carregarSala(salas.tutorial);
 
     player.position.x = 0;
     player.position.y = 430;

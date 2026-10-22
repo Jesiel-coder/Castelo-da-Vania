@@ -63,6 +63,7 @@ export class Boss {
             ataque2: { ini: 3, fim: 5, alcance: 130 }
         };
         this.frameTiro = 4;      // frame do ataque 3 em que o projétil sai
+        this.frameInvocar = 3;   // frame do ataque 4 em que os capangas aparecem
     }
 
     // Troca de animação (só reinicia se for diferente da atual)
