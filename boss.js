@@ -47,7 +47,7 @@ export class Boss {
 
         // ---- Dados da IA e do combate (o game.js lê e escreve aqui) ----
         this.estado = "idle";    // idle | andar | ataque1 | ataque2 | ataque3 | morte | morto
-        this.vidaMax = 25;       // quantos tiros ele aguenta
+        this.vidaMax = 20;       // quantos tiros ele aguenta
         this.vida = this.vidaMax;
         this.velocidade = 1.8;   // px por frame (a 60 fps)
         this.alcanceAtaque = 110;   // distância (centro a centro) para atacar de perto
