@@ -18,21 +18,16 @@ export class Player {
 
         // Mapeamento das linhas do spritesheet
         this.animations = {
-            //animação de idle
-            idle:      { row: 0, frames: 4,  interval: 150, startCol: 0 },
-            //animação de agachar
-            crouch:    { row: 1, frames: 4,  interval: 220, startCol: 0 },
-            //animação de tiro
-            shoot:     { row: 2, frames: 11, interval: 80,  startCol: 0 },
-           //animação de andar
-            walk:      { row: 4, frames: 17, interval: 20,  startCol: 0 },
-           //animação de recarregar
-            reload:    { row: 2, frames: 7,  interval: 93,  startCol: 3 },
-           // Adicionando a animação de tiro enquanto anda (precisa de ajustes)
-            walkShoot: { row: 3, frames: 6,  interval: 80,  startCol: 13 },
-            // Dividindo o pulo em duas fases
-            jumpUp:    { row: 3, frames: 6,  interval: 120,  startCol: 6 }, // Primeiros 6 frames: Subindo
-            fall:      { row: 3, frames: 6,  interval: 120,  startCol: 3}  // Últimos 6 frames: Caindo (começa na coluna 7 / índice 6)
+            idle:      { row: 0, frames: 4,  interval: 200, startCol: 0 },
+            crouch:    { row: 1, frames: 4,  interval: 250, startCol: 0 },
+            shoot:     { row: 2, frames: 11, interval: 60,  startCol: 0 }, // Tiro parado
+            walk:      { row: 4, frames: 17, interval: 60,  startCol: 0 }, // Andar normal
+            reload:    { row: 2, frames: 7,  interval: 93,  startCol: 3 }, // Recarregar
+            
+            walkShoot: { row: 3, frames: 6,  interval: 60,  startCol: 12 }, 
+                      
+            jumpUp:    { row: 3, frames: 6,  interval: 120, startCol: 6 },
+            fall:      { row: 3, frames: 6,  interval: 120, startCol: 3 }
         };
 
         this.currentAnimation = 'idle';
@@ -46,7 +41,7 @@ export class Player {
         this.isShooting = false;
 
         this.shootTimer = 0;
-        this.shootCooldown = 880;
+        this.shootCooldown = 660; // 11 frames * 60ms
 
         // Sistema de munição
         this.maxAmmo = 6;
@@ -91,6 +86,13 @@ export class Player {
         }
         return false;
     }
+    
+    tentarRecarregar(timestamp) {
+        // Só recarrega se não estiver já recarregando, se não estiver atirando e se a munição não estiver cheia
+        if (!this.isReloading && !this.isShooting && this.ammo < this.maxAmmo) {
+            this.startReload(timestamp);
+        }
+    }
 
     startReload(timestamp) {
         if (!this.isReloading) {
@@ -119,45 +121,37 @@ export class Player {
 
         const anim = this.animations[this.currentAnimation];
 
-    if (
-        this.isShooting &&
-        (this.currentAnimation === 'shoot' ||
-         this.currentAnimation === 'walkShoot')
-    ) {
-    const anim = this.animations[this.currentAnimation];
-
-    if (this.frameX >= anim.frames - 1) {
-        this.isShooting = false;
-
-        if (this.ammo <= 0 && !this.isReloading) {
-            this.startReload(timestamp);
+        // Desliga o estado de tiro ao terminar o último frame (seja parado ou andando)
+        if (this.isShooting && (this.currentAnimation === 'shoot' || this.currentAnimation === 'walkShoot')) {
+            if (this.frameX >= anim.frames - 1) {
+                this.isShooting = false;
+                if (this.ammo <= 0 && !this.isReloading) {
+                    this.startReload(timestamp);
+                }
+            }
         }
-    }
-}
 
-
-        // Prioridade visual atualizada com as duas fases do pulo:
+        // Prioridade visual com o Atirar Andando integrado:
         let next = 'idle';
         if (this.isReloading) {
             next = 'reload';
         } else if (this.isCrouching) {
             next = 'crouch';
         } else if (!onGround) {
-            // Se estiver no ar, verifica se está subindo ou caindo pelo velocity.y
             if (this.velocity.y < 0) {
                 next = 'jumpUp';
             } else {
                 next = 'fall';
             }
         } else if (this.isShooting && this.velocity.x !== 0) {
-            next = 'walkShoot';
+            next = 'walkShoot'; // Atirando e andando ao mesmo tempo
         } else if (this.isShooting) {
-            next = 'shoot';
+            next = 'shoot';     // Atirando parado
         } else if (this.velocity.x !== 0) {
-            next = 'walk';
+            next = 'walk';      // Apenas andando
         }
 
-        // Se mudou de animação, reseta o frame para 0
+        // Se mudou de animação, reseta o frame para 0 de forma limpa
         if (next !== this.currentAnimation) {
             this.currentAnimation = next;
             this.frameX = 0;
@@ -169,11 +163,9 @@ export class Player {
 
         const currentAnim = this.animations[this.currentAnimation];
         
-        // Para animações de pulo/queda, podemos travar no último frame da queda em vez de ficar repetindo em looping
         if (timestamp - this.lastTime > currentAnim.interval) {
             this.lastTime = timestamp;
             if (this.currentAnimation === 'fall') {
-                // Trava no último frame da queda para não ficar piscando
                 if (this.frameX < currentAnim.frames - 1) {
                     this.frameX++;
                 }

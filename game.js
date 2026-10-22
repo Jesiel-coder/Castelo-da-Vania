@@ -1567,7 +1567,7 @@ function animate(timestamp) {
     // MOVIMENTAÇÃO HORIZONTAL
     // --------------------------------------
 
-    player.velocity.x = 0;
+   player.velocity.x = 0;
 
     if (!player.isCrouching && !player.isReloading) {
         if (keys.d.pressed) {
@@ -1856,6 +1856,11 @@ window.addEventListener("keydown", (event) => {
         case "W":
         case "ArrowUp":
         case " ":
+            
+            case "r":
+        case "R":
+            player.tentarRecarregar(performance.now());
+            break;
             event.preventDefault();
 
             if (player.isCrouching) break;
