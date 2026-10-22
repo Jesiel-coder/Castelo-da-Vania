@@ -59,6 +59,7 @@ gameOverImg.src = "./img/gameover_bg.png";
 const camera = { x: 0 };
 
 let onGround = false;
+let mostrarInimigos = false;
 let pulosUsados = 0;
 let lastTime = 0;
 let vida = 6;
@@ -1695,6 +1696,17 @@ function animate(timestamp) {
         ctx.fillStyle = i < player.ammo ? "#ffcc00" : "#333";
         ctx.fillRect(20 + i * 28, 50, 20, 20);
     }
+
+    if (mostrarInimigos) {
+    const inimigosVivos = inimigos.filter(
+        inimigo => inimigo.vida > 0
+    ).length;
+
+    ctx.fillStyle = "white";
+    ctx.font = "18px Arial";
+    ctx.fillText(`Inimigos vivos: ${inimigosVivos}`, 20, 100);
+}
+    
         desenharVidaBoss();
 }
 // Inicia o jogo.
@@ -1839,6 +1851,13 @@ window.addEventListener("keydown", (event) => {
         case "E":
             if (!event.repeat) keys.e.pressed = true;
             break;
+
+        case "i":
+        case "I":
+            if (!event.repeat) {
+            mostrarInimigos = !mostrarInimigos;
+            }
+                break;
 
         // TESTE TEMPORÁRIO: simula o boss morrendo.
         case "m":
