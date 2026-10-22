@@ -1856,6 +1856,23 @@ window.addEventListener("keydown", (event) => {
         case "W":
         case "ArrowUp":
         case " ":
+            event.preventDefault();
+
+            if (player.isCrouching) break;
+
+            if (onGround) {
+                player.velocity.y = -13.5; // Impulso para cima
+                onGround = false;
+                pulosUsados = 1;
+            } else if (
+                estado.puloDuplo &&
+                pulosUsados < 2 &&
+                !event.repeat
+            ) {
+                player.velocity.y = -13.5;
+                pulosUsados = 2;
+            }
+            break;
             
             case "r":
         case "R":
