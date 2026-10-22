@@ -35,10 +35,10 @@ export const salas = {
         respawn: { x: 500, y: 500 },             // y = linha do chão onde ele reaparece
 
         // INIMIGOS DESTA SALA
-    inimigos: [
-        { tipo: 'zumbi', x: 700, y: 500 },
-        { tipo: 'zumbi', x: 2000, y: 500 },
-    ],
+        inimigos: [
+        { tipo: 'gargula', x: 4416, y: 500 },
+        { tipo: 'zumbi', x: 3180, y: 500 },
+        ],
 
         eventList: [
             {
@@ -71,6 +71,18 @@ export const salas = {
             //topo do mapa
             { x: 2181, y: 63, w: 23, h: 216 },
         ],
+
+        // INIMIGOS DESTA SALA
+        inimigos: [
+        { tipo: 'gargula', x: 1101, y: 511 },
+        { tipo: 'gargula', x: 1641, y: 511 },
+        { tipo: 'gargula', x: 2096, y: 511 },
+        { tipo: 'zumbi', x: 791, y: 511 },
+        { tipo: 'zumbi', x: 1105, y: 511 },
+        { tipo: 'zumbi', x: 1409, y: 511 },
+        { tipo: 'zumbi', x: 1845, y: 511 },
+        ],
+
         eventList: [
             {
                 id: 'irParaponte',
@@ -107,6 +119,10 @@ export const salas = {
             { x: 1488, y: 0, w: 100, h: 541 },
             //topo do mapa
             { x: 0, y: 0, w: 1535, h: 135 },
+        ],
+        inimigos: [
+            { tipo: 'gargula', x: 872, y: 531 },
+            { tipo: 'gargula', x: 1121, y: 531 },
         ],
         eventList: [
             {

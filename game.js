@@ -1509,8 +1509,6 @@ function atualizarOndas(timestamp, dt) {
 
 // Chamar dentro do ctx.translate(-camera.x, 0)
 function desenharInimigos(timestamp) {
-    console.log("Desenhando inimigos:", inimigos.length);
-
     for (const ini of inimigos) {
         ini.draw(ctx, timestamp);
     }
@@ -1518,8 +1516,6 @@ function desenharInimigos(timestamp) {
     for (const o of ondasSonicas) {
         desenharOnda(ctx, o, timestamp);
     }
-
-    console.log("DESENHO:", inimigos.length);
 }
 
 // ==========================================
