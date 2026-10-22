@@ -12,9 +12,9 @@ const TIPOS = {
         escala: 1.1,                // tamanho do desenho na tela
         largura: 36,                // hitbox
         altura: 85,
-        vidaMax: 3,                 // tiros para morrer (só levando tiro de pé)
+        vidaMax: 2,                 // tiros para morrer (só levando tiro de pé)
         velocidade: 2.5,            // px por frame (a 60 fps): 
-        gatilho: 220,               // distância em que ele levanta
+        gatilho: 400,               // distância em que ele levanta
         distAtaque: 80,             // distância (centro a centro) para arranhar
         golpe: { ini: 4, fim: 6, alcance: 60 },   // frames em que o arranhão machuca
         cambaleia: true,            // para um instante quando leva tiro

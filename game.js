@@ -101,7 +101,7 @@ function dispararTiro() {
             ? player.position.x + player.width
             : player.position.x - tamanho,
 
-        y: player.position.y + player.height * 0.45,
+        y: player.position.y + player.height * 0.15,
 
         vx: player.facingRight ? velocidade : -velocidade,
         tamanho: tamanho
@@ -1509,8 +1509,6 @@ function atualizarOndas(timestamp, dt) {
 
 // Chamar dentro do ctx.translate(-camera.x, 0)
 function desenharInimigos(timestamp) {
-    console.log("Desenhando inimigos:", inimigos.length);
-
     for (const ini of inimigos) {
         ini.draw(ctx, timestamp);
     }
@@ -1518,8 +1516,6 @@ function desenharInimigos(timestamp) {
     for (const o of ondasSonicas) {
         desenharOnda(ctx, o, timestamp);
     }
-
-    console.log("DESENHO:", inimigos.length);
 }
 
 // ==========================================
@@ -1567,7 +1563,7 @@ function animate(timestamp) {
     // MOVIMENTAÇÃO HORIZONTAL
     // --------------------------------------
 
-    player.velocity.x = 0;
+   player.velocity.x = 0;
 
     if (!player.isCrouching && !player.isReloading) {
         if (keys.d.pressed) {
@@ -1856,6 +1852,28 @@ window.addEventListener("keydown", (event) => {
         case "W":
         case "ArrowUp":
         case " ":
+            event.preventDefault();
+
+            if (player.isCrouching) break;
+
+            if (onGround) {
+                player.velocity.y = -13.5; // Impulso para cima
+                onGround = false;
+                pulosUsados = 1;
+            } else if (
+                estado.puloDuplo &&
+                pulosUsados < 2 &&
+                !event.repeat
+            ) {
+                player.velocity.y = -13.5;
+                pulosUsados = 2;
+            }
+            break;
+            
+            case "r":
+        case "R":
+            player.tentarRecarregar(performance.now());
+            break;
             event.preventDefault();
 
             if (player.isCrouching) break;
