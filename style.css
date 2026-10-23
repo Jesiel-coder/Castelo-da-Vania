@@ -49,26 +49,26 @@ canvas {
         display: flex;
         justify-content: space-between;
         position: fixed;
-        left: 16px; 
-        right: 16px; 
-        bottom: 16px;
+        left: 12px; 
+        right: 12px; 
+        bottom: 12px;
         pointer-events: none;
     }
     
     .grupo {
         display: flex;
-        gap: 8px; /* Reduzido um pouco para encaixar os 4 botões confortavelmente */
+        gap: 6px; /* Espaçamento compacto para caber todos os botões */
     }
 
     #controles button {
         pointer-events: auto;
-        width: 60px;  /* Leve ajuste de tamanho para otimizar o espaço */
-        height: 60px;
+        width: 52px;  /* Tamanho otimizado para caber os 5 botões na direita */
+        height: 52px;
         border-radius: 50%;
         border: 2px solid rgba(255, 255, 255, 0.4);
         background: rgba(0, 0, 0, 0.3);
         color: white;
-        font-size: 22px;
+        font-size: 20px;
         touch-action: none;
         user-select: none;
         -webkit-user-select: none;
