@@ -20,7 +20,7 @@ canvas {
     image-rendering: pixelated;
 }
 
-/* Estilo do Botão de Tela Cheia */
+/* Estilo do Botão de Tela Cheia (Permanece intocado) */
 #btn-fullscreen {
     position: fixed;
     top: 16px;
@@ -48,32 +48,59 @@ canvas {
     #controles {
         display: flex;
         justify-content: space-between;
+        align-items: flex-end;
         position: fixed;
-        left: 12px; 
-        right: 12px; 
-        bottom: 12px;
+        left: 16px; 
+        right: 16px; 
+        bottom: 16px;
         pointer-events: none;
     }
-    
-    .grupo {
-        display: flex;
-        gap: 6px; /* Espaçamento compacto para caber todos os botões */
-    }
 
+    /* Estilo base para os botões móveis */
     #controles button {
         pointer-events: auto;
-        width: 52px;  /* Tamanho otimizado para caber os 5 botões na direita */
-        height: 52px;
         border-radius: 50%;
         border: 2px solid rgba(255, 255, 255, 0.4);
-        background: rgba(0, 0, 0, 0.3);
+        background: rgba(0, 0, 0, 0.35);
         color: white;
-        font-size: 20px;
         touch-action: none;
         user-select: none;
         -webkit-user-select: none;
         display: flex;
         justify-content: center;
         align-items: center;
+    }
+
+    /* D-PAD EM CRUZ (Esquerda) */
+    .dpad {
+        display: grid;
+        grid-template-columns: repeat(3, 56px);
+        grid-template-rows: repeat(3, 56px);
+        gap: 4px;
+        pointer-events: auto;
+    }
+
+    .dpad button {
+        width: 56px;
+        height: 56px;
+        font-size: 22px;
+    }
+
+    .dpad-up    { grid-column: 2; grid-row: 1; }
+    .dpad-left  { grid-column: 1; grid-row: 2; }
+    .dpad-down  { grid-column: 2; grid-row: 2; } /* Caso prefira estilo SNES (baixo no centro), ou 3 para tradicional */
+    .dpad-right { grid-column: 3; grid-row: 2; }
+
+    /* BOTÕES DE AÇÃO EM LINHA (Direita - Aumentados em ~1.7x) */
+    .grupo-acoes {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .grupo-acoes button {
+        width: 88px;  /* 52px * 1.7 ≈ 88px */
+        height: 88px;
+        font-size: 32px; /* Fonte proporcional ao novo tamanho */
     }
 }
