@@ -10,10 +10,6 @@ export class Boss {
         this.width = 60;
         this.height = 140;
 
-        // Hitbox (os pés ficam em position.y + height)
-        this.width = 60;
-        this.height = 140;
-
         // Posição vertical que funcionou: y = floorY - alturaNoChao
         this.alturaNoChao = 125;
 

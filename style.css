@@ -1,21 +1,46 @@
-/* tira as margens padrão e deixa o fundo preto */
 html, body {
     margin: 0;
     height: 100%;
     background: black;
     overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
 }
 
-/* centraliza o canvas na tela */
 body {
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-/* estica o canvas o máximo possível, mantendo a proporção 16:9 */
 canvas {
-    width: min(100vw, 177.78vh);
+    width: min(100vw, 177.78dvh);
     aspect-ratio: 16 / 9;
     image-rendering: pixelated;
+}
+
+#controles { display: none; }
+
+@media (pointer: coarse) {
+    #controles {
+        display: flex;
+        justify-content: space-between;
+        position: fixed;
+        left: 0; right: 0; bottom: 16px;
+        padding: 0 24px;
+        pointer-events: none;          /* só os botões recebem toque */
+    }
+    #controles button {
+        pointer-events: auto;
+        width: 72px; height: 72px;
+        margin: 0 6px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        background: rgba(0, 0, 0, 0.35);
+        color: white;
+        font-size: 28px;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+    }
 }

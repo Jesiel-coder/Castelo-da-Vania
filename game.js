@@ -1890,25 +1890,8 @@ window.addEventListener("keydown", (event) => {
             break;
             
             case "r":
-        case "R":
+            case "R":
             player.tentarRecarregar(performance.now());
-            break;
-            event.preventDefault();
-
-            if (player.isCrouching) break;
-
-            if (onGround) {
-                player.velocity.y = -13.5;
-                onGround = false;
-                pulosUsados = 1;
-            } else if (
-                estado.puloDuplo &&
-                pulosUsados < 2 &&
-                !event.repeat
-            ) {
-                player.velocity.y = -13.5;
-                pulosUsados = 2;
-            }
             break;
     }
 });
@@ -1959,3 +1942,17 @@ window.addEventListener("blur", () => {
 
     player.standUp();
 });
+
+//botões na tela: tocar no botão = apertar a tecla
+document.querySelectorAll('#controles button').forEach(botao => {
+    const tecla = botao.dataset.tecla
+    const apertar = (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', { key: tecla })) }
+    const soltar = (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup', { key: tecla })) }
+    botao.addEventListener('pointerdown', apertar)
+    botao.addEventListener('pointerup', soltar)
+    botao.addEventListener('pointercancel', soltar)
+    botao.addEventListener('pointerleave', soltar)
+})
+
+//evita o menu que aparece ao segurar o dedo
+window.addEventListener('contextmenu', (e) => e.preventDefault())
