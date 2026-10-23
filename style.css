@@ -11,12 +11,35 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
 canvas {
     width: min(100vw, 177.78dvh);
     aspect-ratio: 16 / 9;
     image-rendering: pixelated;
+}
+
+/* Estilo do Botão de Tela Cheia */
+#btn-fullscreen {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 #controles { display: none; }
@@ -26,21 +49,31 @@ canvas {
         display: flex;
         justify-content: space-between;
         position: fixed;
-        left: 0; right: 0; bottom: 16px;
-        padding: 0 24px;
-        pointer-events: none;          /* só os botões recebem toque */
+        left: 20px; 
+        right: 20px; 
+        bottom: 16px;
+        pointer-events: none;
     }
+    
+    .grupo {
+        display: flex;
+        gap: 12px;
+    }
+
     #controles button {
         pointer-events: auto;
-        width: 72px; height: 72px;
-        margin: 0 6px;
+        width: 64px; 
+        height: 64px;
         border-radius: 50%;
-        border: 2px solid rgba(255, 255, 255, 0.5);
-        background: rgba(0, 0, 0, 0.35);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        background: rgba(0, 0, 0, 0.3);
         color: white;
-        font-size: 28px;
+        font-size: 24px;
         touch-action: none;
         user-select: none;
         -webkit-user-select: none;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 }

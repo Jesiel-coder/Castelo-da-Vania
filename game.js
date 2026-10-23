@@ -1956,3 +1956,38 @@ document.querySelectorAll('#controles button').forEach(botao => {
 
 //evita o menu que aparece ao segurar o dedo
 window.addEventListener('contextmenu', (e) => e.preventDefault())
+
+// ==========================================
+// SUPORTE MOBILE: TOQUE NA TELA E TELA CHEIA
+// ==========================================
+
+// Tocar na tela para iniciar o jogo ou reiniciar no Game Over
+canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (estado.menu) {
+        iniciarJogo();
+    } else if (estado.morreu) {
+        if (opcaoGameOver === 0) {
+            iniciarJogo();
+        } else {
+            voltarAoMenu();
+        }
+    }
+});
+
+// Botão de Tela Cheia
+const btnFullscreen = document.getElementById("btn-fullscreen");
+if (btnFullscreen) {
+    btnFullscreen.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error("Erro ao tentar entrar em tela cheia:", err);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    });
+}
